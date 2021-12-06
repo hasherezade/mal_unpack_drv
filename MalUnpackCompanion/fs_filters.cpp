@@ -106,22 +106,26 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 	const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
 	const ULONG all_write = FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
 
+	// Retrieve and check the file ID:
 	LONGLONG fileId = FILE_INVALID_FILE_ID;
 	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
 	if (FILE_INVALID_FILE_ID == fileId) {
 		if ((FILE_OPEN != createDisposition) || (DesiredAccess & all_write)) {
+
 			//if could not check the file ID, and the file will be written, deny the access
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 
-			DbgPrint(DRIVER_PREFIX "[%zX] Could not retrieve ID of the file, ACCESS_DENIED!\n");
 			if (fileName) {
-				DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
+				DbgPrint(DRIVER_PREFIX "[%d] [!] Could not retrieve ID of the file: %wZ (status= %X) -> ACCESS_DENIED!\n", sourcePID, fileIdStatus, fileName);
+			}
+			else {
+				DbgPrint(DRIVER_PREFIX "[%d] [!] Could not retrieve ID of the file (status= %X) -> ACCESS_DENIED!\n", sourcePID, fileIdStatus);
 			}
 		}
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
-
+	// Retrieve file size:
 	LONGLONG FileSize = 0;
 	NTSTATUS fileSizeStatus = FltUtil::GetFileSize(FltObjects, FileSize);
 	
@@ -159,11 +163,14 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 	}
 
 	if (!Data::IsProcessInFileOwners(sourcePID, fileId)) {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__": Attempted writing to NOT-owned file, DesiredAccess: %X createDisposition: %X fileID: %zX\n",
+
+		// this file does not belong to the current process, block the access:
+		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+
+		DbgPrint(DRIVER_PREFIX __FUNCTION__": Attempted writing to NOT-owned file, DesiredAccess: %X createDisposition: %X fileID: %zX -> ACCESS_DENIED\n",
 			DesiredAccess,
 			createDisposition, 
 			fileId);
-		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 	}
 	else {
 		DbgPrint(DRIVER_PREFIX __FUNCTION__": Attempted writing to the OWNED file, DesiredAccess: %X createDisposition: %X fileID: %zX\n", 
@@ -203,31 +210,35 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Da
 
 	//get the File ID:
 	LONGLONG fileId;
-	NTSTATUS status = FltUtil::GetFileId(FltObjects, Data, fileId);
-
-	// if watched process...
-	if (!Data::IsProcessInFileOwners(sourcePID, fileId)) {
-
-		// this file does not belong to the current process, block the access:
-		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-
-		const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
-		DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the NOT-owned file:  %wZ fileID: %zX status: %X\n",
-			sourcePID,
-			fileName,
-			fileId,
-			status);
-
-		return FLT_PREOP_COMPLETE;
-	}
+	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
 
 	const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
-	DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the OWNED file:  %wZ fileID: %zX status: %X\n", 
-		sourcePID, 
-		fileName,
-		fileId,
-		status);
+	bool isAllowed = true;
 
+	// if watched process is the ower of this file:
+	if (!Data::IsProcessInFileOwners(sourcePID, fileId)) {
+		// this file does not belong to the current process, block the access:
+		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+		isAllowed = false;
+	}
+
+	// report about the operation:
+	if (fileName) {
+		if (isAllowed) {
+			DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the OWNED file:  %wZ fileID: %zX status: %X\n",
+				sourcePID,
+				fileName,
+				fileId,
+				fileIdStatus);
+		}
+		else {
+			DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the NOT-owned file: %wZ fileID: %zX status: %X -> ACCESS_DENIED\n",
+				sourcePID,
+				fileName,
+				fileId,
+				fileIdStatus);
+		}
+	}
 	return FLT_PREOP_COMPLETE;
 }
 
