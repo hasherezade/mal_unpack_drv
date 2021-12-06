@@ -11,7 +11,6 @@ namespace FltUtil {
 			return STATUS_INVALID_PARAMETER;
 		}
 		
-		//STATUS_SHARING_VIOLATION;
 		PFLT_FILE_NAME_INFORMATION pFileNameInfo = NULL;
 		NTSTATUS status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &pFileNameInfo);
 		if (status != STATUS_SUCCESS) {
@@ -88,7 +87,7 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		// the operation has been rejected at pre-create level
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
-	// check if it is a delete operation:
+
 	auto& params = Data->Iopb->Parameters.Create;
 
 	if (params.Options & FILE_DIRECTORY_FILE) {
@@ -189,7 +188,6 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Da
 
 	// check if it is a delete operation:
 	auto& params = Data->Iopb->Parameters.SetFileInformation;
-
 	if (params.FileInformationClass != FileDispositionInformation && params.FileInformationClass != FileDispositionInformationEx) {
 		// not a delete operation
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
