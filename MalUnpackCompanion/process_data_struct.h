@@ -424,7 +424,7 @@ public:
 			deletionEvent.WaitForSignal(checkInterval);
 		}
 		if (isMine) {
-			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": process termination permited!\n", pid, waitTime, ownerPID);
+			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": process termination permitted!\n", pid, waitTime, ownerPID);
 		}
 		return STATUS_SUCCESS;
 	}
