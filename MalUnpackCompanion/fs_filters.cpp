@@ -114,12 +114,9 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 
 			//if could not check the file ID, and the file will be written, deny the access
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-
+			DbgPrint(DRIVER_PREFIX "[%d] [!] Could not retrieve ID of the file (status= %X) -> ACCESS_DENIED!\n", sourcePID, fileIdStatus);
 			if (fileName) {
-				DbgPrint(DRIVER_PREFIX "[%d] [!] Could not retrieve ID of the file: %wZ (status= %X) -> ACCESS_DENIED!\n", sourcePID, fileName, fileIdStatus);
-			}
-			else {
-				DbgPrint(DRIVER_PREFIX "[%d] [!] Could not retrieve ID of the file (status= %X) -> ACCESS_DENIED!\n", sourcePID, fileIdStatus);
+				DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
 			}
 		}
 		return FLT_POSTOP_FINISHED_PROCESSING;
@@ -148,11 +145,11 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		DbgPrint(DRIVER_PREFIX "[%zX] Creating a new OWNED fileID: %zX fileIdStatus: %X\n", sourcePID, fileId, fileIdStatus);
 		if (fileName) {
 			DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
-			//file:  %wZ 
 		}
 		if (Data::AddFile(fileId, sourcePID) == ADD_LIMIT_EXHAUSTED) {
-			DbgPrint(DRIVER_PREFIX "[%zX] Could not add to the files watchlist: limit exhausted\n", fileId);
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+
+			DbgPrint(DRIVER_PREFIX "[%zX] Could not add to the files watchlist: limit exhausted\n", fileId);
 		}
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
@@ -223,21 +220,20 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Da
 	}
 
 	// report about the operation:
+	if (isAllowed) {
+		DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the OWNED file, fileID: %zX status: %X\n",
+			sourcePID,
+			fileId,
+			fileIdStatus);
+	}
+	else {
+		DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the NOT-owned file, fileID: %zX status: %X -> ACCESS_DENIED\n",
+			sourcePID,
+			fileId,
+			fileIdStatus);
+	}
 	if (fileName) {
-		if (isAllowed) {
-			DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the OWNED file:  %wZ fileID: %zX status: %X\n",
-				sourcePID,
-				fileName,
-				fileId,
-				fileIdStatus);
-		}
-		else {
-			DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the NOT-owned file: %wZ fileID: %zX status: %X -> ACCESS_DENIED\n",
-				sourcePID,
-				fileName,
-				fileId,
-				fileIdStatus);
-		}
+		DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
 	}
 	return FLT_PREOP_COMPLETE;
 }
