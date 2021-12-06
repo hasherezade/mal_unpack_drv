@@ -138,7 +138,7 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 	}
 
 	const ULONG all_create = FILE_CREATE | FILE_SUPERSEDE | FILE_OVERWRITE_IF | FILE_OPEN_IF | FILE_OVERWRITE;
-	// Check if new file is creating or not
+	// Check if it is creating a new file:
 	if ((FILE_CREATE == createDisposition) 
 		|| (FileSize == 0 && (createDisposition & all_create)))
 	{
@@ -146,6 +146,7 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		if (fileName) {
 			DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
 		}
+		// assign this file to the process that created it, deny access on fail:
 		if (Data::AddFile(fileId, sourcePID) == ADD_LIMIT_EXHAUSTED) {
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 
@@ -175,7 +176,7 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 			createDisposition, 
 			fileId);
 	}
-	return FLT_POSTOP_FINISHED_PROCESSING; //do not interfere
+	return FLT_POSTOP_FINISHED_PROCESSING;
 }
 
 FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID*)
