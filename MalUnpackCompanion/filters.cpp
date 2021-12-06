@@ -107,5 +107,5 @@ NTSTATUS OnRegistryNotify(PVOID context, PVOID regNotifyClass, PVOID arg2)
 			return STATUS_SUCCESS; //do not interfere
 	}
 	DbgPrint(DRIVER_PREFIX "[%d] Process is trying to access registry key, notify type: [%d]\n", sourcePID, regNotify);
-	return STATUS_ACCESS_DENIED; //do not interfere
+	return STATUS_ACCESS_DENIED; //block the access
 }
