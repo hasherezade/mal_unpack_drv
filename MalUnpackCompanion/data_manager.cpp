@@ -11,7 +11,7 @@ bool Data::AllocGlobals()
 {
 	g_ProcessNode.init();
 	if (!g_ProcessNode.initItems()) {
-		DbgPrint(DRIVER_PREFIX "Failed to initialize data items!\n");
+		DbgPrint(DRIVER_PREFIX ": Failed to initialize data items!\n");
 		return false;
 	}
 	return true;
@@ -63,7 +63,7 @@ t_add_status Data::AddProcess(ULONG pid, ULONG parentPid)
 {
 	t_add_status status = g_ProcessNode.AddProcess(pid, parentPid);
 	if (status == ADD_LIMIT_EXHAUSTED) {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__ "Cannot add the process: %d, terminating...\n", pid);
+		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Cannot add the process: %d, terminating...\n", pid);
 		ProcessUtil::TerminateProcess(pid);
 	}
 	return status;
@@ -73,7 +73,7 @@ t_add_status Data::AddProcessToFileOwner(ULONG PID, LONGLONG fileId)
 {
 	t_add_status status = g_ProcessNode.AddProcessToFileOwner(PID, fileId);
 	if (status == ADD_LIMIT_EXHAUSTED) {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__ "Cannot add the process: %d, terminating...\n", PID);
+		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Cannot add the process: %d, terminating...\n", PID);
 		ProcessUtil::TerminateProcess(PID);
 	}
 	return status;
@@ -88,7 +88,7 @@ ULONGLONG Data::CountProcesses()
 bool Data::DeleteProcess(ULONG pid)
 {
 	bool isOk = g_ProcessNode.DeleteProcess(pid);
-	DbgPrint(DRIVER_PREFIX __FUNCTION__ "Watched nodes: %d\n", g_ProcessNode.CountNodes());
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Watched nodes: %d\n", g_ProcessNode.CountNodes());
 	return isOk;
 }
 

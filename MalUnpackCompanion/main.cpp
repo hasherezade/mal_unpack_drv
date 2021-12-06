@@ -47,7 +47,6 @@ void _OnProcessCreation(_Inout_ PEPROCESS Process, _In_ HANDLE ProcessId, _Inout
 		}
 		if (Data::AddProcess(PID, ParentPID) == ADD_LIMIT_EXHAUSTED) {
 			DbgPrint(DRIVER_PREFIX "[%d] Could not add to the watchlist: limit exhausted\n", PID);
-			CreateInfo->CreationStatus = STATUS_ACCESS_DENIED;
 		}
 	}
 }
