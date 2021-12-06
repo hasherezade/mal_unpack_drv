@@ -116,7 +116,7 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 
 			if (fileName) {
-				DbgPrint(DRIVER_PREFIX "[%d] [!] Could not retrieve ID of the file: %wZ (status= %X) -> ACCESS_DENIED!\n", sourcePID, fileIdStatus, fileName);
+				DbgPrint(DRIVER_PREFIX "[%d] [!] Could not retrieve ID of the file: %wZ (status= %X) -> ACCESS_DENIED!\n", sourcePID, fileName, fileIdStatus);
 			}
 			else {
 				DbgPrint(DRIVER_PREFIX "[%d] [!] Could not retrieve ID of the file (status= %X) -> ACCESS_DENIED!\n", sourcePID, fileIdStatus);
