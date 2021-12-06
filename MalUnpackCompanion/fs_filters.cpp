@@ -109,7 +109,7 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 	LONGLONG fileId = FILE_INVALID_FILE_ID;
 	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
 	if (FILE_INVALID_FILE_ID == fileId) {
-		if (FILE_OPEN != createDisposition || DesiredAccess & all_write) {
+		if ((FILE_OPEN != createDisposition) || (DesiredAccess & all_write)) {
 			//if could not check the file ID, and the file will be written, deny the access
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 
