@@ -187,18 +187,20 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Da
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
 
-	//get the File ID:
-	LONGLONG fileId;
-	NTSTATUS status = FltUtil::GetFileId(FltObjects, Data, fileId);
-
 	// check if it is a watched process:
 	const ULONG sourcePID = HandleToULong(PsGetCurrentProcessId()); //the PID of the process performing the operation
 	if (!Data::ContainsProcess(sourcePID)) { 
 		return FLT_PREOP_SUCCESS_NO_CALLBACK; //do not interfere
 	}
+
+	//get the File ID:
+	LONGLONG fileId;
+	NTSTATUS status = FltUtil::GetFileId(FltObjects, Data, fileId);
+
 	// if watched process...
-	if (!Data::ContainsFile(fileId)) {
-		// if this is a dropped file, do not allow to delete it
+	if (!Data::IsProcessInFileOwners(sourcePID, fileId)) {
+
+		// this file does not belong to the current process, block the access:
 		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 
 		const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
