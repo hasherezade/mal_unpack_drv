@@ -4,8 +4,8 @@
 
 [Version]
 Signature   = "$Windows NT$"
-Class=ContentScreener
-ClassGuid={3e3f0674-c83c-4558-bb26-9820e1eba5c5}
+Class       = "ActivityMonitor"                         ;This is determined by the work this filter driver does
+ClassGuid   = {b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}    ;This value is determined by the Class
 Provider    = %ManufacturerName%
 DriverVer   = 
 CatalogFile = MalUnpackCompanion.cat
@@ -22,6 +22,7 @@ MiniFilter.DriverFiles  = 12            ;%windir%\system32\drivers
 [DefaultInstall]
 OptionDesc          = %ServiceDescription%
 CopyFiles           = MiniFilter.DriverFiles
+
 
 [DefaultInstall.Services]
 AddService          = %ServiceName%,,MiniFilter.Service
@@ -48,7 +49,7 @@ Dependencies     = "FltMgr"
 ServiceType      = 2                            ;SERVICE_FILE_SYSTEM_DRIVER
 StartType        = 3                            ;SERVICE_DEMAND_START
 ErrorControl     = 1                            ;SERVICE_ERROR_NORMAL
-LoadOrderGroup = "FSFilter Content Screener"
+LoadOrderGroup = "FSFilter Activity Monitor"
 AddReg           = MiniFilter.AddRegistry
 
 ;
@@ -90,5 +91,5 @@ DiskId1                 = "MalUnpackCompanion Device Installation Disk"
 ;Instances specific information.
 DefaultInstance         = "MalUnpackCompanion Instance"
 Instance1.Name          = "MalUnpackCompanion Instance"
-Instance1.Altitude       = "261337"
+Instance1.Altitude       = "361337"
 Instance1.Flags         = 0x0              ; Allow all attachments
