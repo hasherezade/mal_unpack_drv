@@ -101,18 +101,30 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		return FLT_POSTOP_FINISHED_PROCESSING; // not a watched process, do not interfere
 	}
 
+	const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
+	const ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
+	const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
+	const ULONG all_write = FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
+
 	LONGLONG fileId = FILE_INVALID_FILE_ID;
 	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
-
 	if (FILE_INVALID_FILE_ID == fileId) {
-		return FLT_POSTOP_FINISHED_PROCESSING; // skip check
+		if (FILE_OPEN != createDisposition || DesiredAccess & all_write) {
+			//if could not check the file ID, and the file will be written, deny the access
+			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+
+			DbgPrint(DRIVER_PREFIX "[%zX] Could not retrieve ID of the file, ACCESS_DENIED!\n");
+			if (fileName) {
+				DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
+			}
+		}
+		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
-	const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
+
 	LONGLONG FileSize = 0;
 	NTSTATUS fileSizeStatus = FltUtil::GetFileSize(FltObjects, FileSize);
 	
-	const ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
 	if (FILE_OPEN != createDisposition) {
 		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Requested file operation:  %wZ, options: %X createDisposition: %X FileSize: %zX FileSizeStatus: %X\n",
 			sourcePID,
@@ -140,10 +152,6 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		}
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
-
-	const ULONG all_write = FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
-
-	const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
 
 	if (!(DesiredAccess & all_write)) {
 		// not a write access - skip
