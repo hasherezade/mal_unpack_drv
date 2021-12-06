@@ -354,15 +354,16 @@ NTSTATUS HandleDeviceControl(PDEVICE_OBJECT, PIRP Irp)
 	switch (stack->Parameters.DeviceIoControl.IoControlCode) {
 		case IOCTL_MUNPACK_COMPANION_ADD_TO_WATCHED:
 		{
-			DbgPrint("Received IOCTL: IOCTL_PROCESS_WATCHER_ADD_TO_WATCHED \n");
 			status = AddProcessWatch(Irp);
 			break;
 		}
+#ifdef ALLOW_DELETE
 		case IOCTL_MUNPACK_COMPANION_REMOVE_FROM_WATCHED:
 		{
 			status = RemoveProcessWatch(Irp);
 			break;
 		}
+#endif
 		case IOCTL_MUNPACK_COMPANION_TERMINATE_WATCHED:
 		{
 			status = TerminateWatched(Irp);
