@@ -110,8 +110,7 @@ void OnImageLoadNotify(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_I
 		return; // this file is not owned by any process
 	}
 	if (aStat == ADD_LIMIT_EXHAUSTED) {
-		DbgPrint(DRIVER_PREFIX "[%d] Could not add to the watchlist: limit exhausted, killing the process:\n", PID);
-		ProcessUtil::TerminateProcess(PID);
+		DbgPrint(DRIVER_PREFIX "[%d] Could not add to the watchlist: limit exhausted\n");
 	}
 	if (aStat == ADD_OK) {
 		DbgPrint(DRIVER_PREFIX __FUNCTION__" [%d] Added process created from the OWNED file-> %zX\n", PID, fileId);
