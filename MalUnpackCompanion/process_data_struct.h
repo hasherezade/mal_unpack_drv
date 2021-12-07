@@ -184,7 +184,7 @@ public:
 		DbgPrint(DRIVER_PREFIX "Failed to add the node: %d!\n", pid);
 		newItem->_destroy();
 		ItemCount--;
-		return ADD_LIMIT_EXHAUSTED;;
+		return ADD_LIMIT_EXHAUSTED;
 	}
 
 

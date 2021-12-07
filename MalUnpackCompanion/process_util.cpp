@@ -139,18 +139,14 @@ ULONG ProcessUtil::GetProcessParentPID(const PEPROCESS Process)
 	ULONG_PTR parentPID = 0;
 	__try
 	{
-		ULONG size = sizeof(PROCESS_BASIC_INFORMATION);
-		PROCESS_BASIC_INFORMATION* pBasicInfo = (PROCESS_BASIC_INFORMATION*)ExAllocatePoolWithTag(PagedPool, size, DRIVER_TAG);
+		PROCESS_BASIC_INFORMATION pBasicInfo = { 0 };
 
-		if (pBasicInfo) {
-			RtlZeroMemory(pBasicInfo, size);
-			ULONG retrunLen = 0;
-			status = ZwQueryInformationProcess(hProcess, ProcessBasicInformation, pBasicInfo, size, &retrunLen);
-			if (NT_SUCCESS(status) && (retrunLen == size)) {
-				parentPID = pBasicInfo->InheritedFromUniqueProcessId;
-				//DbgPrint(DRIVER_PREFIX "Process ParentID retrieved : [%p]\n", parentPID);
-			}
-			ExFreePool(pBasicInfo);
+		ULONG retrunLen = 0;
+		const ULONG size = sizeof(PROCESS_BASIC_INFORMATION);
+		status = ZwQueryInformationProcess(hProcess, ProcessBasicInformation, &pBasicInfo, size, &retrunLen);
+		if (NT_SUCCESS(status) && (retrunLen == size)) {
+			parentPID = pBasicInfo.InheritedFromUniqueProcessId;
+			//DbgPrint(DRIVER_PREFIX "Process ParentID retrieved : [%p]\n", parentPID);
 		}
 		if (!isCurrentProcess) {
 			ZwClose(hProcess);
