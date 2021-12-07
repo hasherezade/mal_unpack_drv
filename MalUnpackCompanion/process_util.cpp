@@ -91,7 +91,7 @@ NTSTATUS ProcessUtil::TerminateProcess(ULONG PID)
 	DbgPrint(DRIVER_PREFIX "Terminating process: %d\n", PID);
 
 	OBJECT_ATTRIBUTES ObjectAttributes;
-	InitializeObjectAttributes(&ObjectAttributes, NULL, OBJ_INHERIT, NULL, NULL);
+	InitializeObjectAttributes(&ObjectAttributes, NULL, OBJ_KERNEL_HANDLE, NULL, NULL);
 
 	CLIENT_ID ClientId;
 	ClientId.UniqueProcess = (HANDLE)PID;
