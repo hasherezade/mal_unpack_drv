@@ -97,32 +97,25 @@ NTSTATUS ProcessUtil::TerminateProcess(ULONG PID)
 	ClientId.UniqueProcess = (HANDLE)PID;
 	ClientId.UniqueThread = NULL;
 
-	__try
+	HANDLE hProcess;
+	status = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &ObjectAttributes, &ClientId);
+	if (NT_SUCCESS(status))
 	{
-		HANDLE hProcess;
-		status = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &ObjectAttributes, &ClientId);
-		if (NT_SUCCESS(status))
-		{
-			status = ZwTerminateProcess(hProcess, 0);
-			//the terminate operation is already pending
-			if (status == STATUS_PROCESS_IS_TERMINATING) {
-				status = STATUS_SUCCESS;
-				DbgPrint(DRIVER_PREFIX "The terminate operation is already pending\n", status);
-			}
-			if (!NT_SUCCESS(status)) {
-				DbgPrint(DRIVER_PREFIX "ZwTerminateProcess failed with status : %08X\n", status);
-			}
-			ZwClose(hProcess);
+		status = ZwTerminateProcess(hProcess, 0);
+		//the terminate operation is already pending
+		if (status == STATUS_PROCESS_IS_TERMINATING) {
+			status = STATUS_SUCCESS;
+			DbgPrint(DRIVER_PREFIX "The terminate operation is already pending\n", status);
 		}
-		else {
-			DbgPrint(DRIVER_PREFIX "ZwOpenProcess failed with status : %08X\n", status);
+		if (!NT_SUCCESS(status)) {
+			DbgPrint(DRIVER_PREFIX "ZwTerminateProcess failed with status : %08X\n", status);
 		}
+		ZwClose(hProcess);
 	}
-	__except (EXCEPTION_EXECUTE_HANDLER)
-	{
-		status = STATUS_UNSUCCESSFUL;
-		DbgPrint(DRIVER_PREFIX "Terminating process [%d] failed\n", PID);
+	else {
+		DbgPrint(DRIVER_PREFIX "ZwOpenProcess failed with status : %08X\n", status);
 	}
+
 	return status;
 }
 
