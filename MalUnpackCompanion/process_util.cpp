@@ -34,7 +34,7 @@ bool ProcessUtil::CheckProcessPath(const PEPROCESS Process, PWCH supportedName)
 	UNICODE_STRING* processName = (UNICODE_STRING*)ExAllocatePoolWithTag(PagedPool, size, DRIVER_TAG);
 
 	if (processName) {
-		RtlZeroMemory(processName, size);	// ensure string will be NULL-terminated
+		RtlZeroMemory(processName, size); // ensure string will be NULL-terminated
 		status = ZwQueryInformationProcess(hProcess, ProcessImageFileName, processName, size - sizeof(WCHAR), nullptr);
 		if (NT_SUCCESS(status)) {
 			const wchar_t* found = ::wcsstr(processName->Buffer, supportedName);

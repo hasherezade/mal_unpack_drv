@@ -51,19 +51,30 @@ private:
 
 ///
 template<typename T>
-T* AllocBuffer(size_t itemsCount = 1)
+T* AllocBuffer(size_t itemsCount = 1, bool clear = true)
 {
+	if (itemsCount == 0) return nullptr;
+
 	const size_t size = itemsCount * sizeof(T);
-	return (T*)ExAllocatePoolWithTag(PagedPool, size, DRIVER_TAG);
+	T* buf = (T*)ExAllocatePoolWithTag(PagedPool, size, DRIVER_TAG);
+	if (clear) {
+		::memset(buf, 0, size);
+	}
+	return buf;
 }
 
 template<typename T>
-void FreeBuffer(T* Items, size_t MaxItemCount = 1)
+void FreeBuffer(T* Items, size_t MaxItemCount = 1, bool clear = false)
 {
-	const size_t size = MaxItemCount * sizeof(T);
-	::memset(Items, 0, size);
+	if (Items == nullptr) return;
+
+	if (MaxItemCount && clear) {
+		const size_t size = MaxItemCount * sizeof(T);
+		::memset(Items, 0, size);
+	}
 	ExFreePool(Items);
 }
+
 ///
 typedef enum {
 	ADD_OK = 0,
