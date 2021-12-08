@@ -86,7 +86,6 @@ bool ProcessUtil::ShowProcessPath(const PEPROCESS Process)
 
 NTSTATUS ProcessUtil::TerminateProcess(ULONG PID)
 {
-
 	NTSTATUS status = STATUS_SUCCESS;
 	DbgPrint(DRIVER_PREFIX "Terminating process: %d\n", PID);
 

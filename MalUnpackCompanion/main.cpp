@@ -222,43 +222,22 @@ NTSTATUS FetchInputBuffer(PIRP Irp, ProcessData** inpData)
 	return STATUS_SUCCESS; 
 }
 
-NTSTATUS _add_process_watch(ULONG PID)
+
+//---
+t_add_status _AddProcessWatch(ULONG PID)
 {
 	PEPROCESS Process;
 	NTSTATUS status = PsLookupProcessByProcessId(ULongToHandle(PID), &Process);
 	if (!NT_SUCCESS(status)) {
 		DbgPrint(DRIVER_PREFIX ": Such process does not exist: %d\n", PID);
-		return STATUS_INVALID_PARAMETER;
+		return t_add_status::ADD_INVALID_ITEM;
 	}
 	ObDereferenceObject(Process);
 
 	DbgPrint(DRIVER_PREFIX ": Watching process requested %d\n", PID);
-	t_add_status ret = Data::AddProcess(PID, 0);
-	if (ret == ADD_OK || ret == ADD_ALREADY_EXIST) {
-		ULONGLONG count = Data::CountProcessTrees();
-		DbgPrint(DRIVER_PREFIX "[+] Added to the list. Watched nodes = %zd\n", count);
-	}
-	else {
-		ULONGLONG count = Data::CountProcessTrees();
-		DbgPrint(DRIVER_PREFIX "[!] failed to add process to the list. Watched nodes = %zd, ret = %d\n", count, ret);
-	}
-	if (Data::ContainsProcess(PID)) {
-		DbgPrint(DRIVER_PREFIX "[*] The PID exists on the list %d\n", PID);
-	}
-	return STATUS_SUCCESS;
+	return Data::AddProcess(PID, 0);
 }
 
-NTSTATUS _terminate_watched(ULONG PID)
-{
-	if (!Data::ContainsProcess(PID)) {
-		return 0;
-	}
-	NTSTATUS status = ProcessUtil::TerminateProcess(PID);
-	Data::DeleteProcess(PID);
-	return status;
-}
-
-//---
 NTSTATUS AddProcessWatch(PIRP Irp)
 {
 	ProcessData* inpData = nullptr;
@@ -266,9 +245,22 @@ NTSTATUS AddProcessWatch(PIRP Irp)
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
+
 	ULONG pid = inpData->Id;
-	return _add_process_watch(pid);
+	const t_add_status ret = _AddProcessWatch(pid);
+
+	switch (ret) {
+	case ADD_OK:
+	case ADD_ALREADY_EXIST:
+		return STATUS_SUCCESS;
+	case ADD_INVALID_ITEM:
+		return STATUS_INVALID_PARAMETER;
+	}
+	const int count = Data::CountProcessTrees();
+	DbgPrint(DRIVER_PREFIX "[!][%zd] Failed to add process to the list. Watched nodes = %zd, add status = %d\n", pid, count, ret);
+	return STATUS_UNSUCCESSFUL;
 }
+
 
 NTSTATUS RemoveProcessWatch(PIRP Irp)
 {
@@ -286,6 +278,16 @@ NTSTATUS RemoveProcessWatch(PIRP Irp)
 	return STATUS_SUCCESS;
 }
 
+NTSTATUS _TerminateWatched(ULONG PID)
+{
+	if (!Data::ContainsProcess(PID)) {
+		return STATUS_INVALID_PARAMETER;
+	}
+	NTSTATUS status = ProcessUtil::TerminateProcess(PID);
+	Data::DeleteProcess(PID);
+	return status;
+}
+
 NTSTATUS TerminateWatched(PIRP Irp)
 {
 	ProcessData* inpData = nullptr;
@@ -294,7 +296,7 @@ NTSTATUS TerminateWatched(PIRP Irp)
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
-	return _terminate_watched(inpData->Id);
+	return _TerminateWatched(inpData->Id);
 }
 
 NTSTATUS _CopyWatchedList(PIRP Irp, ULONG_PTR& outLen, bool files)
