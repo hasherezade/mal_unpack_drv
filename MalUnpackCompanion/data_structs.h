@@ -41,7 +41,7 @@ class Event {
 public:
 	void Init();
 
-	NTSTATUS WaitForSignal(PLARGE_INTEGER timeout);
+	NTSTATUS WaitForEventSet(PLARGE_INTEGER timeout);
 	LONG SetEvent();
 	LONG ResetEvent();
 

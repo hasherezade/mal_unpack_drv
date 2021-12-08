@@ -20,7 +20,7 @@ void Event::Init()
 	KeInitializeEvent(&_event, NotificationEvent, FALSE);
 }
 
-NTSTATUS Event::WaitForSignal(PLARGE_INTEGER timeout)
+NTSTATUS Event::WaitForEventSet(PLARGE_INTEGER timeout)
 {
 	return KeWaitForSingleObject(&_event, Executive, KernelMode, TRUE, timeout);
 }

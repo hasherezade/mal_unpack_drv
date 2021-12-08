@@ -409,7 +409,7 @@ public:
 
 			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": process requested terminate, waitTime: %zx (owner: %d, remaining children: %d)\n", pid, waitTime, ownerPID, CountProcesses(ownerPID));
 			deletionEvent.ResetEvent();
-			deletionEvent.WaitForSignal(checkInterval);
+			deletionEvent.WaitForEventSet(checkInterval);
 		}
 		if (isMine) {
 			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": process termination permitted!\n", pid, waitTime, ownerPID);
