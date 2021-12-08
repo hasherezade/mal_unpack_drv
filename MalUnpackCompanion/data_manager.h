@@ -27,7 +27,7 @@ namespace Data {
 
     bool IsProcessInFileOwners(ULONG pid1, LONGLONG fileId);
 
-    ULONGLONG CountProcesses();
+    int CountProcessTrees();
 
     bool DeleteProcess(ULONG pid);
 

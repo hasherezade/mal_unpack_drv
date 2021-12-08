@@ -326,18 +326,6 @@ public:
 		return ItemCount;
 	}
 
-	ULONGLONG CountAllProcesses()
-	{
-		AutoLock<FastMutex> lock(Mutex);
-		ULONGLONG count = 0;
-		for (int i = 0; i < ItemCount; i++)
-		{
-			ProcessNode& n = Items[i];
-			count += n._countProcesses();
-		}
-		return count;
-	}
-
 	ULONG GetFileOwner(LONGLONG fileId)
 	{
 		if (FILE_INVALID_FILE_ID == fileId) return 0;

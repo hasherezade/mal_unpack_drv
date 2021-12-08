@@ -79,9 +79,9 @@ t_add_status Data::AddProcessToFileOwner(ULONG PID, LONGLONG fileId)
 	return status;
 }
 
-ULONGLONG Data::CountProcesses()
+int Data::CountProcessTrees()
 {
-	return g_ProcessNode.CountAllProcesses();
+	return g_ProcessNode.CountNodes();
 };
 
 

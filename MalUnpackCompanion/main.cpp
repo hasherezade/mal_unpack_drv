@@ -227,23 +227,23 @@ NTSTATUS _add_process_watch(ULONG PID)
 	PEPROCESS Process;
 	NTSTATUS status = PsLookupProcessByProcessId(ULongToHandle(PID), &Process);
 	if (!NT_SUCCESS(status)) {
-		DbgPrint(DRIVER_PREFIX "Such process does not exist: %d\n", PID);
+		DbgPrint(DRIVER_PREFIX ": Such process does not exist: %d\n", PID);
 		return STATUS_INVALID_PARAMETER;
 	}
 	ObDereferenceObject(Process);
 
-	DbgPrint(DRIVER_PREFIX "Watching process requested %d\n", PID);
+	DbgPrint(DRIVER_PREFIX ": Watching process requested %d\n", PID);
 	t_add_status ret = Data::AddProcess(PID, 0);
 	if (ret == ADD_OK || ret == ADD_ALREADY_EXIST) {
-		ULONGLONG count = Data::CountProcesses();
-		DbgPrint(DRIVER_PREFIX "Added to the list, list size=%zd\n", count);
+		ULONGLONG count = Data::CountProcessTrees();
+		DbgPrint(DRIVER_PREFIX "[+] Added to the list. Watched nodes = %zd\n", count);
 	}
 	else {
-		ULONGLONG count = Data::CountProcesses();
-		DbgPrint(DRIVER_PREFIX "failed to add process to the list, size=%zd, ret = %d\n", count, ret);
+		ULONGLONG count = Data::CountProcessTrees();
+		DbgPrint(DRIVER_PREFIX "[!] failed to add process to the list. Watched nodes = %zd, ret = %d\n", count, ret);
 	}
 	if (Data::ContainsProcess(PID)) {
-		DbgPrint(DRIVER_PREFIX "The PID exists on the list %d\n", PID);
+		DbgPrint(DRIVER_PREFIX "[*] The PID exists on the list %d\n", PID);
 	}
 	return STATUS_SUCCESS;
 }
