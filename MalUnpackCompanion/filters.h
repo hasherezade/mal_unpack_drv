@@ -1,7 +1,6 @@
 #pragma once
 
 #include <ntifs.h>
-#include <ntddk.h>
 
 #include "data_manager.h"
 
