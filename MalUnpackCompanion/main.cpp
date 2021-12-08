@@ -280,7 +280,7 @@ NTSTATUS RemoveProcessWatch(PIRP Irp)
 NTSTATUS _TerminateWatched(ULONG PID)
 {
 	if (!Data::ContainsProcess(PID)) {
-		return STATUS_INVALID_PARAMETER;
+		return STATUS_SUCCESS;
 	}
 	NTSTATUS status = ProcessUtil::TerminateProcess(PID);
 	Data::DeleteProcess(PID);
