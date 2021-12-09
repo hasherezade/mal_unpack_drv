@@ -234,7 +234,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Da
 	if (fileName) {
 		DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
 	}
-	return FLT_PREOP_COMPLETE;
+	return FLT_PREOP_SUCCESS_NO_CALLBACK;
 }
 
 NTSTATUS
