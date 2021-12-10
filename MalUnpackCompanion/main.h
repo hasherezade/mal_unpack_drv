@@ -8,6 +8,8 @@
 
 typedef struct _active_settings {
 
+	bool hasDevice;
+	bool hasLink;
 	bool hasProcessNotify;
 	bool hasThreadNotify;
 	bool hasImageNotify;
@@ -17,6 +19,8 @@ typedef struct _active_settings {
 
 	void init()
 	{
+		hasDevice = false;
+		hasLink = false;
 		hasProcessNotify = false;
 		hasThreadNotify = false;
 		hasImageNotify = false;

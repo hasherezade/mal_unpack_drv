@@ -151,14 +151,20 @@ void MyDriverUnload(_In_ PDRIVER_OBJECT DriverObject)
 
 	UnregisterCallbacks();
 
-	UNICODE_STRING symLink = RTL_CONSTANT_STRING(MY_DRIVER_LINK);
-	// delete symbolic link
-	IoDeleteSymbolicLink(&symLink);
+	if (g_Settings.hasLink) {
+		UNICODE_STRING symLink = RTL_CONSTANT_STRING(MY_DRIVER_LINK);
+		// delete symbolic link
+		IoDeleteSymbolicLink(&symLink);
+		g_Settings.hasLink = false;
+	}
 
-	// delete device object
-	IoDeleteDevice(DriverObject->DeviceObject);
+	if (g_Settings.hasDevice) {
+		// delete device object
+		IoDeleteDevice(DriverObject->DeviceObject);
+		g_Settings.hasDevice = false;
 
-	DbgPrint(DRIVER_PREFIX "driver unloaded!\n");
+		DbgPrint(DRIVER_PREFIX "driver unloaded!\n");
+	}
 }
 
 
@@ -432,12 +438,71 @@ NTSTATUS _RegisterRegistryCallbacks(_In_ PDRIVER_OBJECT DriverObject)
 NTSTATUS RegisterCallbacks(_In_ PDRIVER_OBJECT DriverObject)
 {
 	NTSTATUS status = _RegisterOpenProcessCallbacks();
-
-	// Registry operations filtering:
-	if (NT_SUCCESS(status)) {
-		status = _RegisterRegistryCallbacks(DriverObject);
+	if (!NT_SUCCESS(status)) {
+		return status;
 	}
+	// Registry operations filtering:
+	status = _RegisterRegistryCallbacks(DriverObject);
 	return status;
+}
+
+NTSTATUS _InitializeDriver(_In_ PDRIVER_OBJECT DriverObject)
+{
+	UNICODE_STRING devName = RTL_CONSTANT_STRING(MY_DEVICE);
+
+	PDEVICE_OBJECT DeviceObject = nullptr;
+	NTSTATUS status = IoCreateDevice(DriverObject, 0, &devName, FILE_DEVICE_UNKNOWN, 0, FALSE, &DeviceObject);
+	if (NT_SUCCESS(status)) {
+		g_Settings.hasDevice = true;
+	} else {
+		DbgPrint(DRIVER_PREFIX "Failed to create device (0x%08X)\n", status);
+		return status;
+	}
+
+	UNICODE_STRING symLink = RTL_CONSTANT_STRING(MY_DRIVER_LINK);
+	status = IoCreateSymbolicLink(&symLink, &devName);
+	if (NT_SUCCESS(status)) {
+		g_Settings.hasLink = true;
+	} else {
+		DbgPrint(DRIVER_PREFIX "Failed to create symbolic link (0x%08X)\n", status);
+		return status;
+	}
+
+	status = PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, FALSE);
+	if (NT_SUCCESS(status)) {
+		g_Settings.hasProcessNotify = true;
+	}
+	else {
+		KdPrint((DRIVER_PREFIX "failed to register process callback (0x%08X)\n", status));
+		return status;
+	}
+
+	status = PsSetCreateThreadNotifyRoutine(OnThreadNotify);
+	if (NT_SUCCESS(status)) {
+		g_Settings.hasThreadNotify = true;
+	}
+	else {
+		DbgPrint(DRIVER_PREFIX "failed to set thread callback (status=%08X)\n", status);
+		return status;
+	}
+
+	status = PsSetLoadImageNotifyRoutine(OnImageLoadNotify);
+	if (NT_SUCCESS(status)) {
+		g_Settings.hasImageNotify = true;
+	}
+	else {
+		DbgPrint(DRIVER_PREFIX "failed to set image notify callback (status=%08X)\n", status);
+		return status;
+	}
+
+	if (!Data::AllocGlobals()) {
+		DbgPrint(DRIVER_PREFIX "Failed to initialize global data structures\n");
+		return STATUS_UNSUCCESSFUL;
+	}
+	else {
+		DbgPrint(DRIVER_PREFIX "Initialized global data structures!\n");
+	}
+	return STATUS_SUCCESS;
 }
 
 ///
@@ -460,10 +525,10 @@ DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 
 	if (NT_SUCCESS(status)) {
 		status = FltStartFiltering(g_Settings.gFilterHandle);
-		if (!NT_SUCCESS(status)) {
-			FltUnregisterFilter(g_Settings.gFilterHandle);
-			g_Settings.gFilterHandle = NULL;
-		}
+	}
+	if (!NT_SUCCESS(status)) {
+		UnregisterCallbacks();
+		return status;
 	}
 
 	status = RegisterCallbacks(DriverObject);
@@ -483,58 +548,12 @@ DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 	DbgPrint(DRIVER_PREFIX "OS Version: %d.%d.%d\n", version.dwMajorVersion, version.dwMinorVersion, version.dwBuildNumber);
 	DbgPrint(DRIVER_PREFIX "Driver Version: %s\n", VER_FILEVERSION_STR);
 
-	UNICODE_STRING devName = RTL_CONSTANT_STRING(MY_DEVICE);
-
-	PDEVICE_OBJECT DeviceObject = nullptr;
-	status = IoCreateDevice(DriverObject, 0, &devName, FILE_DEVICE_UNKNOWN, 0, FALSE, &DeviceObject);
-	if (!NT_SUCCESS(status)) {
-		DbgPrint(DRIVER_PREFIX "Failed to create device (0x%08X)\n", status);
-		return status;
-	}
-
-	UNICODE_STRING symLink = RTL_CONSTANT_STRING(MY_DRIVER_LINK);
-	status = IoCreateSymbolicLink(&symLink, &devName);
-	if (!NT_SUCCESS(status)) {
-		DbgPrint(DRIVER_PREFIX "Failed to create symbolic link (0x%08X)\n", status);
-		IoDeleteDevice(DeviceObject);
-		return status;
-	}
-
-	status = PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, FALSE);
+	status = _InitializeDriver(DriverObject);
 	if (NT_SUCCESS(status)) {
-		g_Settings.hasProcessNotify = true;
-	} else {
-		KdPrint((DRIVER_PREFIX "failed to register process callback (0x%08X)\n", status));
-		IoDeleteSymbolicLink(&symLink);
-		IoDeleteDevice(DeviceObject);
-		return status;
-	}
-
-	status = PsSetCreateThreadNotifyRoutine(OnThreadNotify);
-	if (NT_SUCCESS(status)) {
-		g_Settings.hasThreadNotify = true;
+		DbgPrint(DRIVER_PREFIX "DriverEntry completed successfully\n");
 	}
 	else {
-		DbgPrint(DRIVER_PREFIX "failed to set thread callback (status=%08X)\n", status);
-	}
-
-	status = PsSetLoadImageNotifyRoutine(OnImageLoadNotify);
-	if (NT_SUCCESS(status)) {
-		g_Settings.hasImageNotify = true;
-	}
-	else {
-		DbgPrint(DRIVER_PREFIX "failed to set image notify callback (status=%08X)\n", status);
-	}
-
-	if (!Data::AllocGlobals()) {
-		DbgPrint(DRIVER_PREFIX "Failed to initialize global data structures\n");
 		MyDriverUnload(DriverObject);
-		return STATUS_UNSUCCESSFUL;
 	}
-	else {
-		DbgPrint(DRIVER_PREFIX "Initialized global data structures!\n");
-	}
-
-	DbgPrint(DRIVER_PREFIX "DriverEntry completed successfully\n");
-	return STATUS_SUCCESS;
+	return status;
 }
