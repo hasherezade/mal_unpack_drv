@@ -514,6 +514,16 @@ DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 	UNREFERENCED_PARAMETER(RegistryPath);
 	g_Settings.init();
 
+	RTL_OSVERSIONINFOW version = { 0 };
+	RtlGetVersion(&version);
+	DbgPrint(DRIVER_PREFIX "OS Version: %d.%d.%d\n", version.dwMajorVersion, version.dwMinorVersion, version.dwBuildNumber);
+	DbgPrint(DRIVER_PREFIX "Driver Version: %s\n", VER_FILEVERSION_STR);
+
+	if (!RtlIsNtDdiVersionAvailable(NTDDI_WINBLUE)) {
+		DbgPrint(DRIVER_PREFIX "Not supported version of Windows!\n");
+		return STATUS_NOT_SUPPORTED;
+	}
+
 	//
 	//  Register with FltMgr to tell it our callback routines
 	//
@@ -543,10 +553,6 @@ DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = HandleDeviceControl;
 
 	DbgPrint(DRIVER_PREFIX "driver loaded!\n");
-	RTL_OSVERSIONINFOW version = { 0 };
-	RtlGetVersion(&version);
-	DbgPrint(DRIVER_PREFIX "OS Version: %d.%d.%d\n", version.dwMajorVersion, version.dwMinorVersion, version.dwBuildNumber);
-	DbgPrint(DRIVER_PREFIX "Driver Version: %s\n", VER_FILEVERSION_STR);
 
 	status = _InitializeDriver(DriverObject);
 	if (NT_SUCCESS(status)) {
