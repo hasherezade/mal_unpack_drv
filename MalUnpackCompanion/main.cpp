@@ -512,8 +512,8 @@ NTSTATUS
 DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath) 
 {
 	UNREFERENCED_PARAMETER(RegistryPath);
-	g_Settings.init();
 
+	// check version:
 	RTL_OSVERSIONINFOW version = { 0 };
 	RtlGetVersion(&version);
 	DbgPrint(DRIVER_PREFIX "OS Version: %d.%d.%d\n", version.dwMajorVersion, version.dwMinorVersion, version.dwBuildNumber);
@@ -523,6 +523,9 @@ DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 		DbgPrint(DRIVER_PREFIX "Not supported version of Windows!\n");
 		return STATUS_NOT_SUPPORTED;
 	}
+
+	// init used datastructures:
+	g_Settings.init();
 
 	//
 	//  Register with FltMgr to tell it our callback routines
