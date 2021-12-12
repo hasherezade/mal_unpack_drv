@@ -29,7 +29,7 @@ namespace FltUtil {
 		status = FltCreateFile(FltObjects->Filter,
 			FltObjects->Instance,
 			&hFile,
-			GENERIC_READ,
+			SYNCHRONIZE | FILE_READ_ATTRIBUTES,
 			&objAttr,
 			&ioStatusBlock,
 			NULL,
