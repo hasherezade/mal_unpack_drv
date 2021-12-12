@@ -9,19 +9,20 @@ NTSTATUS FileUtil::FetchFileId(HANDLE hFile, LONGLONG &FileId)
         return STATUS_INVALID_PARAMETER;
     }
     NTSTATUS status = STATUS_UNSUCCESSFUL;
+
     __try
     {
         IO_STATUS_BLOCK ioStatusBlock;
-        FILE_ID_INFORMATION fileIdInfo;
+        FILE_INTERNAL_INFORMATION fileIdInfo;
         status = ZwQueryInformationFile(
             hFile,
             &ioStatusBlock,
             &fileIdInfo,
-            sizeof(FILE_ID_INFORMATION),
-            FileIdInformation
+            sizeof(fileIdInfo),
+            FileInternalInformation
         );
         if (NT_SUCCESS(status)) {
-            ::memcpy(&FileId, fileIdInfo.FileId.Identifier, sizeof(ULONGLONG));
+            FileId = fileIdInfo.IndexNumber.QuadPart;
         }
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
