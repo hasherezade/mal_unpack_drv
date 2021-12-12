@@ -40,7 +40,7 @@ NTSTATUS FileUtil::FetchFileId(HANDLE hFile, LONGLONG &FileId)
 
 LONGLONG FileUtil::GetFileIdByPath(PUNICODE_STRING FileName)
 {
-    if (!FileName || !FileName->Buffer) {
+    if (!FileName || !FileName->Buffer || !FileName->Length) {
         //DbgPrint(DRIVER_PREFIX "[!!!] Invalid name passed\n");
         return (FILE_INVALID_FILE_ID);
     }
@@ -55,7 +55,7 @@ LONGLONG FileUtil::GetFileIdByPath(PUNICODE_STRING FileName)
     {
         HANDLE hFile;
         IO_STATUS_BLOCK ioStatusBlock;
-        NTSTATUS status = ZwCreateFile(&hFile, GENERIC_READ, &objAttr, &ioStatusBlock, NULL, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, FILE_OPEN, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0);
+        NTSTATUS status = ZwCreateFile(&hFile, SYNCHRONIZE | FILE_READ_ATTRIBUTES, &objAttr, &ioStatusBlock, NULL, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, FILE_OPEN, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0);
         if (NT_SUCCESS(status)) {
             FetchFileId(hFile, FileId);
             ZwClose(hFile);
