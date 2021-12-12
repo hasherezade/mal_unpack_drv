@@ -27,6 +27,20 @@
 active_settings g_Settings;
 //---
 
+bool _AddProcessToParent(ULONG PID, ULONG ParentPID)
+{
+	if (Data::ContainsProcess(ParentPID)) {
+		DbgPrint(DRIVER_PREFIX "[%d] created WATCHED process: [%d]\n", ParentPID, PID);
+		t_add_status aStat = Data::AddProcess(PID, ParentPID);
+		if (aStat == ADD_OK || aStat == ADD_ALREADY_EXIST) {
+			return true;
+		}
+		if (aStat == ADD_LIMIT_EXHAUSTED) {
+			DbgPrint(DRIVER_PREFIX "[%d] Could not add to the watchlist: limit exhausted\n", PID);
+		}
+	}
+	return false;
+}
 
 void _OnProcessCreation(_Inout_ PEPROCESS Process, _In_ HANDLE ProcessId, _Inout_opt_ PPS_CREATE_NOTIFY_INFO CreateInfo)
 {
@@ -38,14 +52,15 @@ void _OnProcessCreation(_Inout_ PEPROCESS Process, _In_ HANDLE ProcessId, _Inout
 	}
 
 	ULONG PID = HandleToULong(ProcessId);
-	ULONG ParentPID = creatorPID;//HandleToULong(CreateInfo->ParentProcessId);
-	if (Data::ContainsProcess(ParentPID)) {
-		DbgPrint(DRIVER_PREFIX "[%d] created WATCHED process: [%d]\n", ParentPID, PID);
-		if (commandLineSize) {
-			DbgPrint(DRIVER_PREFIX "[%d] -> %S\n", PID, CreateInfo->CommandLine->Buffer);
-		}
-		if (Data::AddProcess(PID, ParentPID) == ADD_LIMIT_EXHAUSTED) {
-			DbgPrint(DRIVER_PREFIX "[%d] Could not add to the watchlist: limit exhausted\n", PID);
+	bool isAdded = _AddProcessToParent(PID, creatorPID);
+	if (isAdded && commandLineSize) {
+		DbgPrint(DRIVER_PREFIX "Added: [%d] -> %S\n", PID, CreateInfo->CommandLine->Buffer);
+	}
+	ULONG ParentPID = HandleToULong(CreateInfo->ParentProcessId);
+	if (ParentPID != creatorPID) {
+		_AddProcessToParent(PID, ParentPID);
+		if (isAdded && commandLineSize) {
+			DbgPrint(DRIVER_PREFIX "Added: [%d] -> %S\n", PID, CreateInfo->CommandLine->Buffer);
 		}
 	}
 }
