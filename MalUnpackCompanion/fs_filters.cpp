@@ -126,9 +126,8 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 	NTSTATUS fileSizeStatus = FltUtil::GetFileSize(FltObjects, FileSize);
 	
 	if (FILE_OPEN != createDisposition) {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Requested file operation:  %wZ, options: %X createDisposition: %X FileSize: %zX FileSizeStatus: %X\n",
+		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": [%lX] Requested file operation, options: %X createDisposition: %X FileSize: %llX FileSizeStatus: %X\n",
 			sourcePID,
-			fileName,
 			params.Options,
 			createDisposition,
 			FileSize,
