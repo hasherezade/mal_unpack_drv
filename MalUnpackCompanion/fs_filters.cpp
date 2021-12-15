@@ -123,6 +123,19 @@ namespace FltUtil {
 		return status;
 	}
 
+	bool _IsAnyCreateOverwriteDisp(ULONG createDisposition)
+	{
+		switch (createDisposition) {
+		case FILE_CREATE:
+		case FILE_SUPERSEDE:
+		case FILE_OVERWRITE_IF:
+		case FILE_OPEN_IF:
+		case FILE_OVERWRITE:
+			return true;
+		}
+		return false;
+	}
+
 	bool IsCreateOrOverwrite(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects)
 	{
 		if (!Data || !FltObjects) return false;
@@ -130,19 +143,21 @@ namespace FltUtil {
 		const auto& params = Data->Iopb->Parameters.Create;
 
 		const ULONG createDisposition = (params.Options >> 24) & 0x000000FF;
-		const ULONG all_create = FILE_CREATE | FILE_SUPERSEDE | FILE_OVERWRITE_IF | FILE_OPEN_IF | FILE_OVERWRITE;
+		const bool isAnyCreate = _IsAnyCreateOverwriteDisp(createDisposition);
 
 		// Retrieve file size:
 		LONGLONG FileSize = 0;
 		FltUtil::GetFileSize(FltObjects, Data, FileSize);
+
 		// Check if it is creating a new file:
 		if ((FILE_CREATE == createDisposition)
-			|| (FileSize == 0 && (createDisposition & all_create)))
+			|| ((FileSize == 0) && isAnyCreate))
 		{
 			const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
-			DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Requested creating new file, createDisposition %X, DesiredAccess %X,  fileSize: %llX\n",
+			DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Requested creating new file, createDisposition %X, DesiredAccess %X, isAnyCreate: %X, fileSize: %llX\n",
 				createDisposition,
 				DesiredAccess,
+				isAnyCreate,
 				FileSize
 			);
 			return true;
