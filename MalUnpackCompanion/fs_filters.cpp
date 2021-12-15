@@ -114,7 +114,9 @@ namespace FltUtil {
 		FltReleaseFileNameInformation(pFileNameInfo);
 
 		if (!NT_SUCCESS(status)) {
-			if (status != STATUS_OBJECT_NAME_NOT_FOUND) {
+			if (status == STATUS_OBJECT_NAME_NOT_FOUND || status == STATUS_OBJECT_PATH_NOT_FOUND) {
+				myFileSize = 0;
+			} else {
 				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[#] Failed to retrieve fileSize of %wZ, status: %X\n", FileName, status);
 			}
 		}
