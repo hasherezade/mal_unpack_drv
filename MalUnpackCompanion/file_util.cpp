@@ -38,6 +38,43 @@ NTSTATUS FileUtil::FetchFileId(HANDLE hFile, LONGLONG &FileId)
 }
 
 
+NTSTATUS FileUtil::GetFileSize(HANDLE hFile, LONGLONG& FileSize)
+{
+    FileSize = (-1);
+
+    if (!hFile) {
+        return STATUS_INVALID_PARAMETER;
+    }
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+
+    __try
+    {
+        IO_STATUS_BLOCK ioStatusBlock = { 0 };
+        FILE_STANDARD_INFORMATION fileInfo = { 0 };
+        status = ZwQueryInformationFile(
+            hFile,
+            &ioStatusBlock,
+            &fileInfo,
+            sizeof(fileInfo),
+            FileStandardInformation
+        );
+        if (NT_SUCCESS(status)) {
+            FileSize = fileInfo.EndOfFile.QuadPart;
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        status = STATUS_UNSUCCESSFUL;
+        DbgPrint(DRIVER_PREFIX __FUNCTION__" [!!!] Exception thrown during the \n");
+    }
+
+    /*if (!NT_SUCCESS(status)) {
+        DbgPrint(DRIVER_PREFIX __FUNCTION__" [!!!] Failed to retrieve file size, status: %X\n", status);
+    }*/
+    return status;
+}
+
+
 LONGLONG FileUtil::GetFileIdByPath(PUNICODE_STRING FileName)
 {
     if (!FileName || !FileName->Buffer || !FileName->Length) {
