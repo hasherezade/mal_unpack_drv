@@ -133,6 +133,20 @@ public:
 		return ItemCount;
 	}
 
+	bool canAddItem()
+	{
+		AutoLock<FastMutex> lock(Mutex);
+		if (Items == NULL) {
+			if (!_initItems()) {
+				return false;
+			}
+		}
+		if (ItemCount >= MaxItemCount) {
+			return false;
+		}
+		return true;
+	}
+
 	t_add_status addItem(T it)
 	{
 		AutoLock<FastMutex> lock(Mutex);

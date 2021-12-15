@@ -87,6 +87,8 @@ protected:
 
 	bool _containsProcess(ULONG pid);
 
+	bool _canAddFile();
+
 	t_add_status _addFile(LONGLONG fileId);
 
 	t_add_status _addProcess(ULONG pid);
@@ -187,6 +189,22 @@ public:
 		return ADD_LIMIT_EXHAUSTED;
 	}
 
+	bool CanAddFile(ULONG parentPid)
+	{
+		if (0 == parentPid) {
+			return false;
+		}
+		AutoLock<FastMutex> lock(Mutex);
+
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n._containsProcess(parentPid)) {
+				return n._canAddFile();
+			}
+		}
+		return false;
+	}
 
 	t_add_status AddFile(LONGLONG fileId, ULONG parentPid)
 	{

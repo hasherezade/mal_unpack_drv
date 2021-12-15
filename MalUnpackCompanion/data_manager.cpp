@@ -54,6 +54,11 @@ bool Data::IsProcessInFileOwners(ULONG pid, LONGLONG fileId)
 	return g_ProcessNode.IsProcessInFileOwners(pid, fileId);
 }
 
+bool Data::CanAddFile(ULONG parentPid)
+{
+	return g_ProcessNode.CanAddFile(parentPid);
+}
+
 t_add_status Data::AddFile(LONGLONG fileId, ULONG parentPid)
 {
 	return g_ProcessNode.AddFile(fileId, parentPid);
