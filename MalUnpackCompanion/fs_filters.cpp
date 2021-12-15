@@ -136,7 +136,6 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 	}
 
 	auto& params = Data->Iopb->Parameters.Create;
-
 	if (params.Options & FILE_DIRECTORY_FILE) {
 		// this is a directory, do not interfere
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
@@ -147,7 +146,6 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 		return FLT_PREOP_SUCCESS_NO_CALLBACK; // not a watched process, do not interfere
 	}
 
-	const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
 	const ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
 	const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
 	const ULONG all_write = FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
@@ -171,10 +169,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 	if ((FILE_CREATE == createDisposition)
 		|| (FileSize == 0 && (createDisposition & all_create)))
 	{
-		DbgPrint(DRIVER_PREFIX __FUNCTION__ " [%zX] Creating a new OWNED fileID\n", sourcePID);
-		if (fileName) {
-			DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileName);
-		}
+		DbgPrint(DRIVER_PREFIX __FUNCTION__ " [%zX] Creating a new OWNED file\n", sourcePID);
 		// check if adding the file is possible:
 		if (!Data::CanAddFile(sourcePID)) {
 
@@ -195,9 +190,6 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 
 			DbgPrint(DRIVER_PREFIX "[%d] [!] Could not retrieve ID of the file (status= %X) -> ACCESS_DENIED!\n", sourcePID, fileIdStatus);
-			if (fileName) {
-				DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
-			}
 			return FLT_PREOP_COMPLETE;
 		}
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
@@ -216,9 +208,6 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 			DesiredAccess,
 			createDisposition,
 			fileId);
-		if (fileName) {
-			DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
-		}
 		return FLT_PREOP_COMPLETE;
 	}
 	else {
