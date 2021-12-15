@@ -94,7 +94,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 		return FLT_PREOP_SUCCESS_NO_CALLBACK; // not a watched process, do not interfere
 	}
 
-	//const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
+	const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
 	const ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
 	const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
 	const ULONG all_write = FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
@@ -102,18 +102,13 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 
 	// Retrieve and check the file ID:
 	LONGLONG fileId = FILE_INVALID_FILE_ID;
-	FltUtil::GetFileId(FltObjects, Data, fileId);
+	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
 	// File ID may be Invalid if the file is not yet created...
 	if (FILE_INVALID_FILE_ID == fileId) {
 		// pass it further...
 		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	}
 
-	DbgPrint(DRIVER_PREFIX __FUNCTION__": Attempted to access the file, DesiredAccess: %X createDisposition: %X fileID: %zX\n",
-		DesiredAccess,
-		createDisposition,
-		fileId);
-	/*
 	// Check if it is creating a new file:
 	if (FILE_CREATE == createDisposition)
 	{
@@ -130,6 +125,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 		}
 		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	}
+
 	if (!(DesiredAccess & all_write)) {
 		// not a write access - skip
 		return FLT_PREOP_SUCCESS_NO_CALLBACK; //do not interfere
@@ -154,7 +150,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 			DesiredAccess,
 			createDisposition,
 			fileId);
-	}*/
+	}
 	return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
 
@@ -238,7 +234,8 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		}
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
-
+	/*
+	//this should be done pre-op
 	if (!(DesiredAccess & all_write)) {
 		// not a write access - skip
 		return FLT_POSTOP_FINISHED_PROCESSING; //do not interfere
@@ -260,7 +257,7 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 			DesiredAccess, 
 			createDisposition, 
 			fileId);
-	}
+	}*/
 	return FLT_POSTOP_FINISHED_PROCESSING;
 }
 
