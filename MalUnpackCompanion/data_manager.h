@@ -21,6 +21,8 @@ namespace Data {
 
     t_add_status AddFile(LONGLONG fileId, ULONG parentPid);
 
+    bool CanAddFile(ULONG parentPid);
+
     t_add_status AddProcess(ULONG pid, ULONG parentPid);
 
     t_add_status AddProcessToFileOwner(ULONG PID, LONGLONG fileId);

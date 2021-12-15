@@ -18,6 +18,16 @@ bool ProcessNode::_containsProcess(ULONG pid)
 	return processList->containsItem(pid);
 }
 
+bool ProcessNode::_canAddFile()
+{
+	if (!filesList) {
+		if (!_initItems()) {
+			return false;
+		}
+	}
+	return filesList->canAddItem();
+}
+
 t_add_status ProcessNode::_addFile(LONGLONG fileId)
 {
 	if (!filesList) {

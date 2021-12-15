@@ -48,7 +48,9 @@ namespace FltUtil {
 		FltReleaseFileNameInformation(pFileNameInfo);
 
 		if (!NT_SUCCESS(status)) {
-			DbgPrint(DRIVER_PREFIX __FUNCTION__ "[#] Failed to retrieve fileID of %wZ, status: %X\n", FileName, status);
+			if (status != STATUS_OBJECT_NAME_NOT_FOUND) {
+				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[#] Failed to retrieve fileID of %wZ, status: %X\n", FileName, status);
+			}
 		}
 		return status;
 	}
@@ -71,6 +73,90 @@ namespace FltUtil {
 
 
 ///
+
+FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID* CompletionContext)
+{
+	UNREFERENCED_PARAMETER(CompletionContext);
+
+	if (Data->RequestorMode == KernelMode) {
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+
+	auto& params = Data->Iopb->Parameters.Create;
+
+	if (params.Options & FILE_DIRECTORY_FILE) {
+		// this is a directory, do not interfere
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+	// check if the process is watched:
+	const ULONG sourcePID = HandleToULong(PsGetCurrentProcessId()); //the PID of the process performing the operation
+	if (!Data::ContainsProcess(sourcePID)) {
+		return FLT_PREOP_SUCCESS_NO_CALLBACK; // not a watched process, do not interfere
+	}
+
+	//const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
+	const ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
+	const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
+	const ULONG all_write = FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
+	const ULONG all_overwrite = FILE_SUPERSEDE | FILE_OVERWRITE_IF | FILE_OPEN_IF | FILE_OVERWRITE;
+
+	// Retrieve and check the file ID:
+	LONGLONG fileId = FILE_INVALID_FILE_ID;
+	FltUtil::GetFileId(FltObjects, Data, fileId);
+	// File ID may be Invalid if the file is not yet created...
+	if (FILE_INVALID_FILE_ID == fileId) {
+		// pass it further...
+		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+	}
+
+	DbgPrint(DRIVER_PREFIX __FUNCTION__": Attempted to access the file, DesiredAccess: %X createDisposition: %X fileID: %zX\n",
+		DesiredAccess,
+		createDisposition,
+		fileId);
+	/*
+	// Check if it is creating a new file:
+	if (FILE_CREATE == createDisposition)
+	{
+		DbgPrint(DRIVER_PREFIX "[%zX] Creating a new OWNED fileID: %zX fileIdStatus: %X\n", sourcePID, fileId, fileIdStatus);
+		if (fileName) {
+			DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
+		}
+		// check if adding the file is possible:
+		if (!Data::CanAddFile(sourcePID)) {
+
+			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+			DbgPrint(DRIVER_PREFIX "[%zX] Could not add to the files watchlist: limit exhausted\n", fileId);
+			return FLT_PREOP_COMPLETE;
+		}
+		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+	}
+	if (!(DesiredAccess & all_write)) {
+		// not a write access - skip
+		return FLT_PREOP_SUCCESS_NO_CALLBACK; //do not interfere
+	}
+
+	if (!Data::IsProcessInFileOwners(sourcePID, fileId)) {
+
+		// this file does not belong to the current process, block the access:
+		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+
+		DbgPrint(DRIVER_PREFIX __FUNCTION__": Attempted writing to NOT-owned file, DesiredAccess: %X createDisposition: %X fileID: %zX -> ACCESS_DENIED\n",
+			DesiredAccess,
+			createDisposition,
+			fileId);
+		if (fileName) {
+			DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
+		}
+		return FLT_PREOP_COMPLETE;
+	}
+	else {
+		DbgPrint(DRIVER_PREFIX __FUNCTION__": Attempted writing to the OWNED file, DesiredAccess: %X createDisposition: %X fileID: %zX\n",
+			DesiredAccess,
+			createDisposition,
+			fileId);
+	}*/
+	return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+}
 
 FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID CompletionContext, FLT_POST_OPERATION_FLAGS Flags)
 {
@@ -140,13 +226,13 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 	if ((FILE_CREATE == createDisposition) 
 		|| (FileSize == 0 && (createDisposition & all_create)))
 	{
-		DbgPrint(DRIVER_PREFIX "[%zX] Creating a new OWNED fileID: %zX fileIdStatus: %X\n", sourcePID, fileId, fileIdStatus);
+		DbgPrint(DRIVER_PREFIX __FUNCTION__ " [%zX] Creating a new OWNED fileID: %zX fileIdStatus: %X\n", sourcePID, fileId, fileIdStatus);
 		if (fileName) {
 			DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
 		}
 		// assign this file to the process that created it, deny access on fail:
 		if (Data::AddFile(fileId, sourcePID) == ADD_LIMIT_EXHAUSTED) {
-			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+			//Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 
 			DbgPrint(DRIVER_PREFIX "[%zX] Could not add to the files watchlist: limit exhausted\n", fileId);
 		}
@@ -158,6 +244,7 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		return FLT_POSTOP_FINISHED_PROCESSING; //do not interfere
 	}
 
+	//this should be done pre-op
 	if (!Data::IsProcessInFileOwners(sourcePID, fileId)) {
 
 		// this file does not belong to the current process, block the access:
