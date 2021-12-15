@@ -122,10 +122,53 @@ namespace FltUtil {
 		}
 		return status;
 	}
+
+	bool _IsAnyCreateOverwriteDisp(ULONG createDisposition)
+	{
+		switch (createDisposition) {
+		case FILE_CREATE:
+		case FILE_SUPERSEDE:
+		case FILE_OVERWRITE_IF:
+		case FILE_OPEN_IF:
+		case FILE_OVERWRITE:
+			return true;
+		}
+		return false;
+	}
+
+	bool IsCreateOrOverwrite(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects)
+	{
+		if (!Data || !FltObjects) return false;
+
+		const auto& params = Data->Iopb->Parameters.Create;
+
+		const ULONG createDisposition = (params.Options >> 24) & 0x000000FF;
+		const bool isAnyCreate = _IsAnyCreateOverwriteDisp(createDisposition);
+
+		// Retrieve file size:
+		LONGLONG FileSize = 0;
+		FltUtil::GetFileSize(FltObjects, Data, FileSize);
+
+		// Check if it is creating a new file:
+		if ((FILE_CREATE == createDisposition)
+			|| ((FileSize == 0) && isAnyCreate))
+		{
+			const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
+			DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Requested creating new file, createDisposition %X, DesiredAccess %X, isAnyCreate: %X, fileSize: %llX\n",
+				createDisposition,
+				DesiredAccess,
+				isAnyCreate,
+				FileSize
+			);
+			return true;
+		}
+		return false;
+	}
 }
 
 
 ///
+
 
 FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID* CompletionContext)
 {
@@ -146,39 +189,20 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 		return FLT_PREOP_SUCCESS_NO_CALLBACK; // not a watched process, do not interfere
 	}
 
-	const ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
-	const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
-	const ULONG all_write = FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
-
 	// Check if it is creating a new file:
-	LONGLONG FileSize = 0;
-	NTSTATUS fileSizeStatus = FltUtil::GetFileSize(FltObjects, Data, FileSize);
-
-	if (FILE_OPEN != createDisposition) {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": [%lX] Requested file operation, options: %X createDisposition: %X FileSize: %llX FileSizeStatus: %X\n",
-			sourcePID,
-			params.Options,
-			createDisposition,
-			FileSize,
-			fileSizeStatus
-		);
-	}
-
-	const ULONG all_create = FILE_CREATE | FILE_SUPERSEDE | FILE_OVERWRITE_IF | FILE_OPEN_IF | FILE_OVERWRITE;
-	// Check if it is creating a new file:
-	if ((FILE_CREATE == createDisposition)
-		|| (FileSize == 0 && (createDisposition & all_create)))
-	{
-		DbgPrint(DRIVER_PREFIX __FUNCTION__ " [%zX] Creating a new OWNED file\n", sourcePID);
+	if (FltUtil::IsCreateOrOverwrite(Data, FltObjects)) {
 		// check if adding the file is possible:
 		if (!Data::CanAddFile(sourcePID)) {
-
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 			DbgPrint(DRIVER_PREFIX "[%zX] Could not add to the files watchlist: limit exhausted\n", sourcePID);
 			return FLT_PREOP_COMPLETE;
 		}
 		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	}
+
+	const ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
+	const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
+	const ULONG all_write = FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
 
 	// Retrieve and check the file ID:
 	LONGLONG fileId = FILE_INVALID_FILE_ID;
@@ -247,48 +271,27 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		return FLT_POSTOP_FINISHED_PROCESSING; // not a watched process, do not interfere
 	}
 
-	const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
-	const ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
-	const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
-	const ULONG all_write = FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
-
 	// Retrieve and check the file ID:
 	LONGLONG fileId = FILE_INVALID_FILE_ID;
 	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
 	if (FILE_INVALID_FILE_ID == fileId) {
+		// this should never happend: case handled pre-create
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
-	// Retrieve file size:
-	LONGLONG FileSize = 0;
-	NTSTATUS fileSizeStatus = FltUtil::GetFileSize(FltObjects, Data, FileSize);
-	
-	if (FILE_OPEN != createDisposition) {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": [%lX] Requested file operation, options: %X createDisposition: %X FileSize: %llX FileSizeStatus: %X\n",
-			sourcePID,
-			params.Options,
-			createDisposition,
-			FileSize,
-			fileSizeStatus
-		);
-	}
+	const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
 
-	const ULONG all_create = FILE_CREATE | FILE_SUPERSEDE | FILE_OVERWRITE_IF | FILE_OPEN_IF | FILE_OVERWRITE;
 	// Check if it is creating a new file:
-	if ((FILE_CREATE == createDisposition) 
-		|| (FileSize == 0 && (createDisposition & all_create)))
-	{
+	if (FltUtil::IsCreateOrOverwrite(Data, FltObjects)) {
 		DbgPrint(DRIVER_PREFIX __FUNCTION__ " [%zX] Creating a new OWNED fileID: %zX fileIdStatus: %X\n", sourcePID, fileId, fileIdStatus);
 		if (fileName) {
 			DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
 		}
-		// assign this file to the process that created it, deny access on fail:
+		// assign this file to the process that created it:
 		if (Data::AddFile(fileId, sourcePID) == ADD_LIMIT_EXHAUSTED) {
-			DbgPrint(DRIVER_PREFIX "[%zX] Could not add to the files watchlist: limit exhausted\n", fileId);
+			DbgPrint(DRIVER_PREFIX __FUNCTION__" [%zX] Could not add to the files watchlist: limit exhausted\n", fileId);
 		}
-		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
-
 	return FLT_POSTOP_FINISHED_PROCESSING;
 }
 
