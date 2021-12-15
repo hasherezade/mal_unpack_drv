@@ -48,7 +48,7 @@ namespace FltUtil {
 		FltReleaseFileNameInformation(pFileNameInfo);
 
 		if (!NT_SUCCESS(status)) {
-			if (status != STATUS_OBJECT_NAME_NOT_FOUND) {
+			if (status != STATUS_OBJECT_NAME_NOT_FOUND && status != STATUS_OBJECT_PATH_NOT_FOUND) {
 				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[#] Failed to retrieve fileID of %wZ, status: %X\n", FileName, status);
 			}
 		}
@@ -56,7 +56,7 @@ namespace FltUtil {
 	}
 
 	//WARNING: use it only after the object is verified, otherwise it can cause crash!
-	NTSTATUS GetFileSize(PCFLT_RELATED_OBJECTS FltObjects, LONGLONG& myFileSize)
+	NTSTATUS FltGetFileSize(PCFLT_RELATED_OBJECTS FltObjects, LONGLONG& myFileSize)
 	{
 		myFileSize = (-1);
 		if (!FltObjects) {
@@ -66,6 +66,57 @@ namespace FltUtil {
 		NTSTATUS status = FsRtlGetFileSize(FltObjects->FileObject, &fileSize);
 		if (NT_SUCCESS(status)) {
 			myFileSize = fileSize.QuadPart;
+		}
+		return status;
+	}
+
+	NTSTATUS GetFileSize(PCFLT_RELATED_OBJECTS FltObjects, PFLT_CALLBACK_DATA Data, LONGLONG& myFileSize)
+	{
+		myFileSize = (-1);
+		if (!Data || !FltObjects) {
+			return STATUS_INVALID_PARAMETER;
+		}
+
+		PFLT_FILE_NAME_INFORMATION pFileNameInfo = NULL;
+		NTSTATUS status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &pFileNameInfo);
+		if (status != STATUS_SUCCESS) {
+			if (STATUS_FLT_INVALID_NAME_REQUEST != status) {
+				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[!!!] Failed to get filename information, status: %X\n", status);
+			}
+			return status;
+		}
+
+		PUNICODE_STRING FileName = &pFileNameInfo->Name;
+		OBJECT_ATTRIBUTES objAttr;
+		InitializeObjectAttributes(&objAttr, FileName, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
+
+		HANDLE hFile;
+		IO_STATUS_BLOCK ioStatusBlock;
+		status = FltCreateFile(FltObjects->Filter,
+			FltObjects->Instance,
+			&hFile,
+			SYNCHRONIZE | FILE_READ_ATTRIBUTES,
+			&objAttr,
+			&ioStatusBlock,
+			NULL,
+			FILE_ATTRIBUTE_NORMAL,
+			FILE_SHARE_READ,
+			FILE_OPEN,
+			FILE_SYNCHRONOUS_IO_NONALERT,
+			NULL,
+			0,
+			IO_IGNORE_SHARE_ACCESS_CHECK
+		);
+		if (NT_SUCCESS(status)) {
+			status = FileUtil::GetFileSize(hFile, myFileSize);
+			FltClose(hFile);
+		}
+		FltReleaseFileNameInformation(pFileNameInfo);
+
+		if (!NT_SUCCESS(status)) {
+			if (status != STATUS_OBJECT_NAME_NOT_FOUND) {
+				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[#] Failed to retrieve fileSize of %wZ, status: %X\n", FileName, status);
+			}
 		}
 		return status;
 	}
@@ -98,7 +149,6 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 	const ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
 	const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
 	const ULONG all_write = FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
-	const ULONG all_overwrite = FILE_SUPERSEDE | FILE_OVERWRITE_IF | FILE_OPEN_IF | FILE_OVERWRITE;
 
 	// Retrieve and check the file ID:
 	LONGLONG fileId = FILE_INVALID_FILE_ID;
@@ -110,9 +160,25 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 	}
 
 	// Check if it is creating a new file:
-	if (FILE_CREATE == createDisposition)
+	LONGLONG FileSize = 0;
+	NTSTATUS fileSizeStatus = FltUtil::GetFileSize(FltObjects, Data, FileSize);
+
+	if (FILE_OPEN != createDisposition) {
+		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": [%lX] Requested file operation, options: %X createDisposition: %X FileSize: %llX FileSizeStatus: %X\n",
+			sourcePID,
+			params.Options,
+			createDisposition,
+			FileSize,
+			fileSizeStatus
+		);
+	}
+
+	const ULONG all_create = FILE_CREATE | FILE_SUPERSEDE | FILE_OVERWRITE_IF | FILE_OPEN_IF | FILE_OVERWRITE;
+	// Check if it is creating a new file:
+	if ((FILE_CREATE == createDisposition)
+		|| (FileSize == 0 && (createDisposition & all_create)))
 	{
-		DbgPrint(DRIVER_PREFIX "[%zX] Creating a new OWNED fileID: %zX fileIdStatus: %X\n", sourcePID, fileId, fileIdStatus);
+		DbgPrint(DRIVER_PREFIX __FUNCTION__ " [%zX] Creating a new OWNED fileID: %zX fileIdStatus: %X\n", sourcePID, fileId, fileIdStatus);
 		if (fileName) {
 			DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
 		}
@@ -205,7 +271,7 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 
 	// Retrieve file size:
 	LONGLONG FileSize = 0;
-	NTSTATUS fileSizeStatus = FltUtil::GetFileSize(FltObjects, FileSize);
+	NTSTATUS fileSizeStatus = FltUtil::GetFileSize(FltObjects, Data, FileSize);
 	
 	if (FILE_OPEN != createDisposition) {
 		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": [%lX] Requested file operation, options: %X createDisposition: %X FileSize: %llX FileSizeStatus: %X\n",
@@ -228,8 +294,6 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		}
 		// assign this file to the process that created it, deny access on fail:
 		if (Data::AddFile(fileId, sourcePID) == ADD_LIMIT_EXHAUSTED) {
-			//Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-
 			DbgPrint(DRIVER_PREFIX "[%zX] Could not add to the files watchlist: limit exhausted\n", fileId);
 		}
 		return FLT_POSTOP_FINISHED_PROCESSING;
