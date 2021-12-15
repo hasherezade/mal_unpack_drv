@@ -49,13 +49,6 @@ namespace FltUtil {
 			FltClose(hFile);
 		}
 		FltReleaseFileNameInformation(pFileNameInfo);
-
-		if (!NT_SUCCESS(status)) {
-			if (status != STATUS_OBJECT_NAME_NOT_FOUND)
-			{
-				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[#] Failed to retrieve fileID of %wZ, status: %X\n", FileName, status);
-			}
-		}
 		return status;
 	}
 
@@ -119,14 +112,6 @@ namespace FltUtil {
 			FltClose(hFile);
 		}
 		FltReleaseFileNameInformation(pFileNameInfo);
-
-		if (!NT_SUCCESS(status)) {
-			if (status != STATUS_OBJECT_NAME_NOT_FOUND)
-			{
-				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[#] Failed to retrieve fileSize of %wZ, status: %X\n", FileName, status);
-			}
-			
-		}
 		return status;
 	}
 
@@ -204,7 +189,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 		// check if adding the file is possible:
 		if (!Data::CanAddFile(sourcePID)) {
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-			DbgPrint(DRIVER_PREFIX "[%zX] Could not add to the files watchlist: limit exhausted\n", sourcePID);
+			DbgPrint(DRIVER_PREFIX "[%d] Could not add to the files watchlist: limit exhausted\n", sourcePID);
 			return FLT_PREOP_COMPLETE;
 		}
 		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
@@ -239,10 +224,11 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 		// this file does not belong to the current process, block the access:
 		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 
-		DbgPrint(DRIVER_PREFIX __FUNCTION__": Attempted writing to NOT-owned file, DesiredAccess: %X createDisposition: %X fileID: %zX -> ACCESS_DENIED\n",
+		/*/DbgPrint(DRIVER_PREFIX __FUNCTION__": Attempted writing to NOT-owned file, DesiredAccess: %X createDisposition: %X fileID: %zX -> ACCESS_DENIED\n",
 			DesiredAccess,
 			createDisposition,
 			fileId);
+		*/
 		return FLT_PREOP_COMPLETE;
 	}
 	else {
@@ -290,13 +276,12 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
-	const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
-
 	// Check if it is creating a new file:
 	if (FltUtil::IsCreateOrOverwrite(Data, FltObjects)) {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__ " [%zX] Creating a new OWNED fileID: %zX fileIdStatus: %X\n", sourcePID, fileId, fileIdStatus);
+		DbgPrint(DRIVER_PREFIX __FUNCTION__ " [%d] Creating a new OWNED fileID: %zX fileIdStatus: %X\n", sourcePID, fileId, fileIdStatus);
+		const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
 		if (fileName) {
-			DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
+			DbgPrint(DRIVER_PREFIX "[%llX] file Name: %wZ \n", fileId, fileName);
 		}
 		// assign this file to the process that created it:
 		if (Data::AddFile(fileId, sourcePID) == ADD_LIMIT_EXHAUSTED) {
