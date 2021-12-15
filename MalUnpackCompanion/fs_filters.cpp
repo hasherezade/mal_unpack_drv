@@ -223,7 +223,8 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 			//if could not check the file ID, and the file will be written, deny the access
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 
-			DbgPrint(DRIVER_PREFIX "[%d] [!] Could not retrieve ID of the file (status= %X) -> ACCESS_DENIED!\n", sourcePID, fileIdStatus);
+			DbgPrint(DRIVER_PREFIX __FUNCTION__ "[%d] [!] Could not retrieve ID of the file (status= %X), createDisposition: %X, DesiredAccess: %X-> ACCESS_DENIED!\n",
+				sourcePID, fileIdStatus, createDisposition, DesiredAccess);
 			return FLT_PREOP_COMPLETE;
 		}
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
