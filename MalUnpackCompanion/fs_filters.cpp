@@ -185,18 +185,27 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	}
 
+	// Retrieve and check the file ID:
+	LONGLONG fileId = FILE_INVALID_FILE_ID;
+	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
+	//It is not a creation of new file, and cannot verify the file ID, so deny the access...
+	if (FILE_INVALID_FILE_ID == fileId) {
+		if ((FILE_OPEN != createDisposition) || (DesiredAccess & all_write)) {
+			//if could not check the file ID, and the file will be written, deny the access
+			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+
+			DbgPrint(DRIVER_PREFIX "[%d] [!] Could not retrieve ID of the file (status= %X) -> ACCESS_DENIED!\n", sourcePID, fileIdStatus);
+			if (fileName) {
+				DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
+			}
+			return FLT_PREOP_COMPLETE;
+		}
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+
 	if (!(DesiredAccess & all_write)) {
 		// not a write access - skip
 		return FLT_PREOP_SUCCESS_NO_CALLBACK; //do not interfere
-	}
-
-	// Retrieve and check the file ID:
-	LONGLONG fileId = FILE_INVALID_FILE_ID;
-	FltUtil::GetFileId(FltObjects, Data, fileId);
-	// File ID may be Invalid if the file is not yet created...
-	if (FILE_INVALID_FILE_ID == fileId) {
-		// pass it further...
-		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	}
 
 	if (!Data::IsProcessInFileOwners(sourcePID, fileId)) {
@@ -258,15 +267,6 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 	LONGLONG fileId = FILE_INVALID_FILE_ID;
 	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
 	if (FILE_INVALID_FILE_ID == fileId) {
-		if ((FILE_OPEN != createDisposition) || (DesiredAccess & all_write)) {
-
-			//if could not check the file ID, and the file will be written, deny the access
-			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-			DbgPrint(DRIVER_PREFIX "[%d] [!] Could not retrieve ID of the file (status= %X) -> ACCESS_DENIED!\n", sourcePID, fileIdStatus);
-			if (fileName) {
-				DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
-			}
-		}
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
@@ -299,30 +299,7 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		}
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
-	/*
-	//this should be done pre-op
-	if (!(DesiredAccess & all_write)) {
-		// not a write access - skip
-		return FLT_POSTOP_FINISHED_PROCESSING; //do not interfere
-	}
 
-	//this should be done pre-op
-	if (!Data::IsProcessInFileOwners(sourcePID, fileId)) {
-
-		// this file does not belong to the current process, block the access:
-		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-
-		DbgPrint(DRIVER_PREFIX __FUNCTION__": Attempted writing to NOT-owned file, DesiredAccess: %X createDisposition: %X fileID: %zX -> ACCESS_DENIED\n",
-			DesiredAccess,
-			createDisposition, 
-			fileId);
-	}
-	else {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__": Attempted writing to the OWNED file, DesiredAccess: %X createDisposition: %X fileID: %zX\n", 
-			DesiredAccess, 
-			createDisposition, 
-			fileId);
-	}*/
 	return FLT_POSTOP_FINISHED_PROCESSING;
 }
 
