@@ -150,15 +150,6 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 	const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
 	const ULONG all_write = FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
 
-	// Retrieve and check the file ID:
-	LONGLONG fileId = FILE_INVALID_FILE_ID;
-	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
-	// File ID may be Invalid if the file is not yet created...
-	if (FILE_INVALID_FILE_ID == fileId) {
-		// pass it further...
-		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
-	}
-
 	// Check if it is creating a new file:
 	LONGLONG FileSize = 0;
 	NTSTATUS fileSizeStatus = FltUtil::GetFileSize(FltObjects, Data, FileSize);
@@ -178,15 +169,15 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 	if ((FILE_CREATE == createDisposition)
 		|| (FileSize == 0 && (createDisposition & all_create)))
 	{
-		DbgPrint(DRIVER_PREFIX __FUNCTION__ " [%zX] Creating a new OWNED fileID: %zX fileIdStatus: %X\n", sourcePID, fileId, fileIdStatus);
+		DbgPrint(DRIVER_PREFIX __FUNCTION__ " [%zX] Creating a new OWNED fileID\n", sourcePID);
 		if (fileName) {
-			DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
+			DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileName);
 		}
 		// check if adding the file is possible:
 		if (!Data::CanAddFile(sourcePID)) {
 
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-			DbgPrint(DRIVER_PREFIX "[%zX] Could not add to the files watchlist: limit exhausted\n", fileId);
+			DbgPrint(DRIVER_PREFIX "[%zX] Could not add to the files watchlist: limit exhausted\n", sourcePID);
 			return FLT_PREOP_COMPLETE;
 		}
 		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
@@ -197,8 +188,16 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 		return FLT_PREOP_SUCCESS_NO_CALLBACK; //do not interfere
 	}
 
-	if (!Data::IsProcessInFileOwners(sourcePID, fileId)) {
+	// Retrieve and check the file ID:
+	LONGLONG fileId = FILE_INVALID_FILE_ID;
+	FltUtil::GetFileId(FltObjects, Data, fileId);
+	// File ID may be Invalid if the file is not yet created...
+	if (FILE_INVALID_FILE_ID == fileId) {
+		// pass it further...
+		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+	}
 
+	if (!Data::IsProcessInFileOwners(sourcePID, fileId)) {
 		// this file does not belong to the current process, block the access:
 		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 
