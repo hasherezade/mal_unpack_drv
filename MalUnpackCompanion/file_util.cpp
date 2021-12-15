@@ -58,7 +58,7 @@ NTSTATUS FileUtil::GetFileSize(HANDLE hFile, LONGLONG& FileSize)
             sizeof(fileInfo),
             FileStandardInformation
         );
-        if (NT_SUCCESS(status)) {
+        if (NT_SUCCESS(status) && !fileInfo.Directory) {
             FileSize = fileInfo.EndOfFile.QuadPart;
         }
     }
