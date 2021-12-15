@@ -13,9 +13,12 @@ namespace FltUtil {
 		
 		PFLT_FILE_NAME_INFORMATION pFileNameInfo = NULL;
 		NTSTATUS status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &pFileNameInfo);
-		if (status != STATUS_SUCCESS) {
-			if (STATUS_FLT_INVALID_NAME_REQUEST != status) {
-				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[!!!] Failed to get filename information, status: %X\n", status);
+		if (!NT_SUCCESS(status)) {
+			if (status != STATUS_FLT_INVALID_NAME_REQUEST && 
+				status != STATUS_OBJECT_NAME_NOT_FOUND && 
+				status != STATUS_OBJECT_PATH_NOT_FOUND)
+			{
+					DbgPrint(DRIVER_PREFIX __FUNCTION__ "[!!!] Failed to get filename information, status: %X\n", status);
 			}
 			return status;
 		}
@@ -48,7 +51,8 @@ namespace FltUtil {
 		FltReleaseFileNameInformation(pFileNameInfo);
 
 		if (!NT_SUCCESS(status)) {
-			if (status != STATUS_OBJECT_NAME_NOT_FOUND && status != STATUS_OBJECT_PATH_NOT_FOUND) {
+			if (status != STATUS_OBJECT_NAME_NOT_FOUND)
+			{
 				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[#] Failed to retrieve fileID of %wZ, status: %X\n", FileName, status);
 			}
 		}
@@ -79,8 +83,11 @@ namespace FltUtil {
 
 		PFLT_FILE_NAME_INFORMATION pFileNameInfo = NULL;
 		NTSTATUS status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &pFileNameInfo);
-		if (status != STATUS_SUCCESS) {
-			if (STATUS_FLT_INVALID_NAME_REQUEST != status) {
+		if (!NT_SUCCESS(status)) {
+			if (status != STATUS_FLT_INVALID_NAME_REQUEST &&
+				status != STATUS_OBJECT_NAME_NOT_FOUND &&
+				status != STATUS_OBJECT_PATH_NOT_FOUND)
+			{
 				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[!!!] Failed to get filename information, status: %X\n", status);
 			}
 			return status;
@@ -114,11 +121,11 @@ namespace FltUtil {
 		FltReleaseFileNameInformation(pFileNameInfo);
 
 		if (!NT_SUCCESS(status)) {
-			if (status == STATUS_OBJECT_NAME_NOT_FOUND || status == STATUS_OBJECT_PATH_NOT_FOUND) {
-				myFileSize = 0;
-			} else {
+			if (status != STATUS_OBJECT_NAME_NOT_FOUND)
+			{
 				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[#] Failed to retrieve fileSize of %wZ, status: %X\n", FileName, status);
 			}
+			
 		}
 		return status;
 	}
@@ -147,7 +154,10 @@ namespace FltUtil {
 
 		// Retrieve file size:
 		LONGLONG FileSize = 0;
-		FltUtil::GetFileSize(FltObjects, Data, FileSize);
+		NTSTATUS fileSizeStatus = FltUtil::GetFileSize(FltObjects, Data, FileSize);
+		if (fileSizeStatus == STATUS_OBJECT_NAME_NOT_FOUND) {
+			FileSize = 0; //name not found, it is a new file
+		}
 
 		// Check if it is creating a new file:
 		if ((FILE_CREATE == createDisposition)
