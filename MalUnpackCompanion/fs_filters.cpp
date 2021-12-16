@@ -322,32 +322,32 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Da
 	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
 
 	const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
-	bool isAllowed = true;
 
-	// if watched process is the ower of this file:
-	if (!Data::IsProcessInFileOwners(sourcePID, fileId)) {
-		// this file does not belong to the current process, block the access:
-		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-		isAllowed = false;
-	}
-
-	// report about the operation:
-	if (isAllowed) {
-		DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the OWNED file, fileID: %zX status: %X\n",
+	// check if the watched process is the ower of this file:
+	if (Data::IsProcessInFileOwners(sourcePID, fileId)) {
+		// report about the operation:
+		DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the OWNED file, fileID: %llX status: %X\n",
 			sourcePID,
 			fileId,
 			fileIdStatus);
+
+		if (fileName) {
+			DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
+		}
+		return FLT_PREOP_SUCCESS_NO_CALLBACK; //do not interfere
 	}
-	else {
-		DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the NOT-owned file, fileID: %zX status: %X -> ACCESS_DENIED\n",
-			sourcePID,
-			fileId,
-			fileIdStatus);
-	}
+
+	// this file does not belong to the current process, block the access:
+	Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+
+	DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the NOT-owned file, fileID: %llX status: %X -> ACCESS_DENIED\n",
+		sourcePID,
+		fileId,
+		fileIdStatus);
 	if (fileName) {
 		DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
 	}
-	return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	return FLT_PREOP_COMPLETE; //the status was modified
 }
 
 NTSTATUS
