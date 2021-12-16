@@ -192,7 +192,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 			DbgPrint(DRIVER_PREFIX "[%d] Could not add to the files watchlist: limit exhausted\n", sourcePID);
 			return FLT_PREOP_COMPLETE;
 		}
-		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+		return FLT_PREOP_SYNCHRONIZE;
 	}
 
 	const ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
@@ -223,20 +223,13 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 	if (!Data::IsProcessInFileOwners(sourcePID, fileId)) {
 		// this file does not belong to the current process, block the access:
 		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-
-		/*/DbgPrint(DRIVER_PREFIX __FUNCTION__": Attempted writing to NOT-owned file, DesiredAccess: %X createDisposition: %X fileID: %zX -> ACCESS_DENIED\n",
-			DesiredAccess,
-			createDisposition,
-			fileId);
-		*/
 		return FLT_PREOP_COMPLETE;
 	}
-	else {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__": Attempted writing to the OWNED file, DesiredAccess: %X createDisposition: %X fileID: %zX\n",
-			DesiredAccess,
-			createDisposition,
-			fileId);
-	}
+
+	DbgPrint(DRIVER_PREFIX __FUNCTION__": Attempted writing to the OWNED file, DesiredAccess: %X createDisposition: %X fileID: %zX\n",
+		DesiredAccess,
+		createDisposition,
+		fileId);
 	return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
 
