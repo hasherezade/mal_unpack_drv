@@ -111,7 +111,7 @@ void OnImageLoadNotify(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_I
 	}
 
 	// retrieve image path manually: backward compatibility with Windows < 10
-	FileUtil::t_nameInfo imagePathInfo;
+	FileUtil::t_nameInfo imagePathInfo = { 0 };
 	if (!FileUtil::RetrieveImagePath(ImageInfo, imagePathInfo)) {
 		return;
 	}
