@@ -15,7 +15,6 @@
 #include "file_util.h"
 
 #define SLEEP_TIME 1000
-#define MAX_PATH_LEN 1024
 
 #define ALTITUDE_PROCESS_FILTER L"12345.6171"
 #define ALTITUDE_REGISTRY_FILTER L"7657.124"
@@ -102,39 +101,6 @@ void OnThreadNotify(HANDLE ProcessId, HANDLE Thread, BOOLEAN Create)
 	}
 }
 
-bool _RetrieveImagePath(PIMAGE_INFO ImageInfo, WCHAR ImagePath[MAX_PATH_LEN])
-{
-	if (KeGetCurrentIrql() != PASSIVE_LEVEL) {
-		return false;
-	}
-	PIMAGE_INFO_EX extendedInfo = NULL;
-	if (!ImageInfo->ExtendedInfoPresent) {
-		return false;
-	}
-
-	extendedInfo = CONTAINING_RECORD(ImageInfo, IMAGE_INFO_EX, ImageInfo);
-	if (!extendedInfo || !extendedInfo->FileObject) {
-		return false;
-	}
-
-	ULONG retLen = 0;
-	struct _nameInfo {
-		OBJECT_NAME_INFORMATION ObjNameInfo;
-		WCHAR FileName[MAX_PATH_LEN];
-	} fileNameInfo = { 0 };
-
-	NTSTATUS status = ObQueryNameString(extendedInfo->FileObject, &fileNameInfo.ObjNameInfo, sizeof(fileNameInfo), &retLen);
-	if (!NT_SUCCESS(status)) {
-		return false;
-	}
-	USHORT retrievedLen = fileNameInfo.ObjNameInfo.Name.Length;
-	if (retrievedLen == 0) {
-		return false;
-	}
-	const size_t len = retrievedLen < MAX_PATH_LEN ? retrievedLen : MAX_PATH_LEN;
-	::memcpy(ImagePath, fileNameInfo.FileName, len);
-	return true;
-}
 
 void OnImageLoadNotify(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_INFO ImageInfo)
 {
@@ -145,18 +111,15 @@ void OnImageLoadNotify(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_I
 	}
 
 	// retrieve image path manually: backward compatibility with Windows < 10
-	WCHAR ImagePath[MAX_PATH_LEN] = { 0 };
-	if (!_RetrieveImagePath(ImageInfo, ImagePath)) {
+	FileUtil::t_nameInfo imagePathInfo;
+	if (!FileUtil::RetrieveImagePath(ImageInfo, imagePathInfo)) {
 		return;
 	}
-
-	UNICODE_STRING MappedFile = { 0 };
-	RtlInitUnicodeString(&MappedFile, ImagePath);
-
+	PUNICODE_STRING ImagePath = &imagePathInfo.ObjNameInfo.Name;
 	const ULONG PID = HandleToULong(ProcessId);
-	//DbgPrint(DRIVER_PREFIX __FUNCTION__" [%d] Retrieved path: %S\n", PID, ImagePath);
+	//DbgPrint(DRIVER_PREFIX __FUNCTION__" [%d] Retrieved path: %S\n", PID, ImagePath->Buffer);
 
-	LONGLONG fileId = FileUtil::GetFileIdByPath(&MappedFile);
+	LONGLONG fileId = FileUtil::GetFileIdByPath(ImagePath);
 	if (fileId == FILE_INVALID_FILE_ID) {
 		return;
 	}

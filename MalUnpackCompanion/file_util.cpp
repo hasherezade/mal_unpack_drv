@@ -1,6 +1,35 @@
 #include "file_util.h"
 #include "common.h"
 
+bool FileUtil::RetrieveImagePath(PIMAGE_INFO ImageInfo, t_nameInfo& fileNameInfo)
+{
+    if (KeGetCurrentIrql() != PASSIVE_LEVEL) {
+        return false;
+    }
+
+    if (!ImageInfo || !ImageInfo->ExtendedInfoPresent) {
+        return false;
+    }
+
+    PIMAGE_INFO_EX extendedInfo = NULL;
+    extendedInfo = CONTAINING_RECORD(ImageInfo, IMAGE_INFO_EX, ImageInfo);
+    if (!extendedInfo || !extendedInfo->FileObject) {
+        return false;
+    }
+
+    ULONG retLen = 0;
+    NTSTATUS status = ObQueryNameString(extendedInfo->FileObject, &fileNameInfo.ObjNameInfo, sizeof(t_nameInfo), &retLen);
+    if (!NT_SUCCESS(status)) {
+        return false;
+    }
+    if (!fileNameInfo.ObjNameInfo.Name.Buffer || 
+        fileNameInfo.ObjNameInfo.Name.Length == 0)
+    {
+        return false;
+    }
+    return true;
+}
+
 NTSTATUS FileUtil::FetchFileId(HANDLE hFile, LONGLONG &FileId)
 {
     FileId = FILE_INVALID_FILE_ID;
@@ -107,3 +136,4 @@ LONGLONG FileUtil::GetFileIdByPath(PUNICODE_STRING FileName)
     }
     return FileId;
 }
+
