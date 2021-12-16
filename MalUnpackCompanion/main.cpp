@@ -104,16 +104,22 @@ void OnThreadNotify(HANDLE ProcessId, HANDLE Thread, BOOLEAN Create)
 
 void OnImageLoadNotify(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_INFO ImageInfo)
 {
-	UNREFERENCED_PARAMETER(ImageInfo);
+	UNREFERENCED_PARAMETER(FullImageName);
 	if (ProcessId == nullptr) {
 		// system image, ignore
 		return;
 	}
-	if (!FullImageName) { //Image name is empty
+
+	// retrieve image path manually: backward compatibility with Windows < 10
+	FileUtil::t_nameInfo imagePathInfo = { 0 };
+	if (!FileUtil::RetrieveImagePath(ImageInfo, imagePathInfo)) {
 		return;
 	}
+	PUNICODE_STRING ImagePath = &imagePathInfo.ObjNameInfo.Name;
 	const ULONG PID = HandleToULong(ProcessId);
-	LONGLONG fileId = FileUtil::GetFileIdByPath(FullImageName);
+	//DbgPrint(DRIVER_PREFIX __FUNCTION__" [%d] Retrieved path: %S\n", PID, ImagePath->Buffer);
+
+	LONGLONG fileId = FileUtil::GetFileIdByPath(ImagePath);
 	if (fileId == FILE_INVALID_FILE_ID) {
 		return;
 	}

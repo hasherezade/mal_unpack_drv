@@ -272,7 +272,7 @@ private:
 		if (ItemCount >= MaxItemCount) {
 			return false;
 		}
-		for (int i = ItemCount; i >= startIndx; i--) {
+		for (int i = ItemCount; i > startIndx; i--) {
 			Items[i] = Items[i - 1];
 		}
 		ItemCount++;
