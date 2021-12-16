@@ -189,7 +189,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 		// check if adding the file is possible:
 		if (!Data::CanAddFile(sourcePID)) {
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-			KdPrint((DRIVER_PREFIX "[%d] Could not add to the files watchlist: limit exhausted\n", sourcePID));
+			KdPrint((DRIVER_PREFIX " [%d] Could not add to the files watchlist: limit exhausted\n", sourcePID));
 			return FLT_PREOP_COMPLETE;
 		}
 		return FLT_PREOP_SYNCHRONIZE; // sync with post-op
@@ -211,7 +211,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 				return FLT_PREOP_COMPLETE;
 			}
 			//if could not check the file ID, and the file will be written, deny the access
-			DbgPrint(DRIVER_PREFIX __FUNCTION__ "[%d] [!] Could not retrieve ID of the file (status= %X), createDisposition: %X, DesiredAccess: %X-> ACCESS_DENIED!\n",
+			DbgPrint(DRIVER_PREFIX __FUNCTION__ " [%d] [!] Could not retrieve ID of the file (status= %X), createDisposition: %X, DesiredAccess: %X-> ACCESS_DENIED!\n",
 				sourcePID, fileIdStatus, createDisposition, DesiredAccess);
 			
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
@@ -281,7 +281,7 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		}
 		// assign this file to the process that created it:
 		if (Data::AddFile(fileId, sourcePID) == ADD_LIMIT_EXHAUSTED) {
-			DbgPrint(DRIVER_PREFIX __FUNCTION__" [%zX] Could not add to the files watchlist: limit exhausted\n", fileId);
+			DbgPrint(DRIVER_PREFIX __FUNCTION__" [%llX] Could not add to the files watchlist: limit exhausted\n", fileId);
 		}
 	}
 	return FLT_POSTOP_FINISHED_PROCESSING;
