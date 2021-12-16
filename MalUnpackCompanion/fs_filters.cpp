@@ -15,10 +15,10 @@ namespace FltUtil {
 		NTSTATUS status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &pFileNameInfo);
 		if (!NT_SUCCESS(status)) {
 			if (status != STATUS_FLT_INVALID_NAME_REQUEST && 
-				status != STATUS_OBJECT_NAME_NOT_FOUND && 
+				status != STATUS_OBJECT_NAME_INVALID &&
 				status != STATUS_OBJECT_PATH_NOT_FOUND)
 			{
-					DbgPrint(DRIVER_PREFIX __FUNCTION__ "[!!!] Failed to get filename information, status: %X\n", status);
+				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[!!!] Failed to get filename information, status: %X\n", status);
 			}
 			return status;
 		}
@@ -78,7 +78,7 @@ namespace FltUtil {
 		NTSTATUS status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &pFileNameInfo);
 		if (!NT_SUCCESS(status)) {
 			if (status != STATUS_FLT_INVALID_NAME_REQUEST &&
-				status != STATUS_OBJECT_NAME_NOT_FOUND &&
+				status != STATUS_OBJECT_NAME_INVALID &&
 				status != STATUS_OBJECT_PATH_NOT_FOUND)
 			{
 				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[!!!] Failed to get filename information, status: %X\n", status);
