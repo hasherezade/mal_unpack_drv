@@ -101,7 +101,6 @@ void OnThreadNotify(HANDLE ProcessId, HANDLE Thread, BOOLEAN Create)
 	}
 }
 
-
 void OnImageLoadNotify(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_INFO ImageInfo)
 {
 	if (ProcessId == nullptr) {
@@ -111,11 +110,14 @@ void OnImageLoadNotify(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_I
 #ifdef _RETRIEVE_PATH
 	UNREFERENCED_PARAMETER(FullImageName);
 	// retrieve image path manually: backward compatibility with Windows < 10
-	FileUtil::t_nameInfo imagePathInfo = { 0 };
-	if (!FileUtil::RetrieveImagePath(ImageInfo, imagePathInfo)) {
+	WCHAR FileName[FileUtil::MAX_PATH_LEN] = { 0 };
+	if (!FileUtil::RetrieveImagePath(ImageInfo, FileName)) {
 		return;
 	}
-	PUNICODE_STRING ImagePath = &imagePathInfo.ObjNameInfo.Name;
+	UNICODE_STRING ImageU = { 0 };
+	RtlInitUnicodeString(&ImageU, FileName);
+
+	PUNICODE_STRING ImagePath = &ImageU;
 #else
 	UNREFERENCED_PARAMETER(ImageInfo);
 	PUNICODE_STRING ImagePath = FullImageName;

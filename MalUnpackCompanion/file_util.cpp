@@ -1,32 +1,31 @@
 #include "file_util.h"
 #include "common.h"
 
-bool FileUtil::RetrieveImagePath(PIMAGE_INFO ImageInfo, t_nameInfo& fileNameInfo)
+#include <fltKernel.h>
+
+bool FileUtil::RetrieveImagePath(PIMAGE_INFO ImageInfo, WCHAR FileName[MAX_PATH_LEN])
 {
     if (KeGetCurrentIrql() != PASSIVE_LEVEL) {
         return false;
     }
-
     if (!ImageInfo || !ImageInfo->ExtendedInfoPresent) {
         return false;
     }
-
     PIMAGE_INFO_EX extendedInfo = NULL;
     extendedInfo = CONTAINING_RECORD(ImageInfo, IMAGE_INFO_EX, ImageInfo);
     if (!extendedInfo || !extendedInfo->FileObject) {
         return false;
     }
-
-    ULONG retLen = 0;
-    NTSTATUS status = ObQueryNameString(extendedInfo->FileObject, &fileNameInfo.ObjNameInfo, sizeof(t_nameInfo), &retLen);
+    PFLT_FILE_NAME_INFORMATION fileNameInformation = NULL;
+    NTSTATUS status = FltGetFileNameInformationUnsafe(extendedInfo->FileObject, NULL, FLT_FILE_NAME_NORMALIZED, &fileNameInformation);
     if (!NT_SUCCESS(status)) {
         return false;
     }
-    if (!fileNameInfo.ObjNameInfo.Name.Buffer || 
-        fileNameInfo.ObjNameInfo.Name.Length == 0)
-    {
+    const size_t len = fileNameInformation->Name.Length < MAX_PATH_LEN ? fileNameInformation->Name.Length : MAX_PATH_LEN;
+    if (!len) {
         return false;
     }
+    ::memcpy(FileName, fileNameInformation->Name.Buffer, len);
     return true;
 }
 

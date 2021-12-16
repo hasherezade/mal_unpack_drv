@@ -11,7 +11,7 @@ namespace FileUtil {
         WCHAR FileName[MAX_PATH_LEN];
     } t_nameInfo;
 
-    bool RetrieveImagePath(PIMAGE_INFO ImageInfo, t_nameInfo &NameInfo);
+    bool RetrieveImagePath(PIMAGE_INFO ImageInfo, WCHAR FileName[MAX_PATH_LEN]);
 
     NTSTATUS FetchFileId(HANDLE hFile, LONGLONG& FileId);
 
