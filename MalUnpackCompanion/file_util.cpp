@@ -21,12 +21,14 @@ bool FileUtil::RetrieveImagePath(PIMAGE_INFO ImageInfo, WCHAR FileName[MAX_PATH_
     if (!NT_SUCCESS(status)) {
         return false;
     }
+    bool isOk = false;
     const size_t len = fileNameInformation->Name.Length < MAX_PATH_LEN ? fileNameInformation->Name.Length : MAX_PATH_LEN;
-    if (!len) {
-        return false;
+    if (len) {
+        ::memcpy(FileName, fileNameInformation->Name.Buffer, len);
+        isOk = true;
     }
-    ::memcpy(FileName, fileNameInformation->Name.Buffer, len);
-    return true;
+    FltReleaseFileNameInformation(fileNameInformation);
+    return isOk;
 }
 
 NTSTATUS FileUtil::FetchFileId(HANDLE hFile, LONGLONG &FileId)
