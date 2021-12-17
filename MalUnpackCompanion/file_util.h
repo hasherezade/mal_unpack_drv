@@ -6,11 +6,6 @@ namespace FileUtil {
 
     const USHORT MAX_PATH_LEN = 1024;
 
-    typedef struct nameInfo {
-        OBJECT_NAME_INFORMATION ObjNameInfo;
-        WCHAR FileName[MAX_PATH_LEN];
-    } t_nameInfo;
-
     bool RetrieveImagePath(PIMAGE_INFO ImageInfo, WCHAR FileName[MAX_PATH_LEN]);
 
     NTSTATUS FetchFileId(HANDLE hFile, LONGLONG& FileId);
