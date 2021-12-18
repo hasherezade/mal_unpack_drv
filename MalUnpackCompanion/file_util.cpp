@@ -64,7 +64,7 @@ NTSTATUS FileUtil::FetchFileId(HANDLE hFile, LONGLONG &FileId)
 }
 
 
-NTSTATUS FileUtil::GetFileSize(HANDLE hFile, LONGLONG& FileSize)
+NTSTATUS FileUtil::FetchFileSize(HANDLE hFile, LONGLONG& FileSize)
 {
     FileSize = (-1);
 

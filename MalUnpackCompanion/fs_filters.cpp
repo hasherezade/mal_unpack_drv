@@ -108,7 +108,7 @@ namespace FltUtil {
 			IO_IGNORE_SHARE_ACCESS_CHECK
 		);
 		if (NT_SUCCESS(status)) {
-			status = FileUtil::GetFileSize(hFile, myFileSize);
+			status = FileUtil::FetchFileSize(hFile, myFileSize);
 			FltClose(hFile);
 		}
 		FltReleaseFileNameInformation(pFileNameInfo);

@@ -10,7 +10,7 @@ namespace FileUtil {
 
     NTSTATUS FetchFileId(HANDLE hFile, LONGLONG& FileId);
 
-    NTSTATUS GetFileSize(HANDLE hFile, LONGLONG& FileSize);
+    NTSTATUS FetchFileSize(HANDLE hFile, LONGLONG& FileSize);
 
     LONGLONG GetFileIdByPath(PUNICODE_STRING FileName);
 };
