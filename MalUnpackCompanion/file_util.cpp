@@ -58,11 +58,7 @@ NTSTATUS FileUtil::FetchFileId(HANDLE hFile, LONGLONG &FileId)
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
         status = STATUS_UNSUCCESSFUL;
-        DbgPrint(DRIVER_PREFIX __FUNCTION__" [!!!] Exception thrown during the \n");
-    }
-
-    if (!NT_SUCCESS(status)) {
-        DbgPrint(DRIVER_PREFIX __FUNCTION__" [!!!] Failed to retrieve file ID, status: %X\n", status);
+        DbgPrint(DRIVER_PREFIX __FUNCTION__" [!!!] Exception thrown\n");
     }
     return status;
 }
@@ -95,12 +91,8 @@ NTSTATUS FileUtil::GetFileSize(HANDLE hFile, LONGLONG& FileSize)
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
         status = STATUS_UNSUCCESSFUL;
-        DbgPrint(DRIVER_PREFIX __FUNCTION__" [!!!] Exception thrown during the \n");
+        DbgPrint(DRIVER_PREFIX __FUNCTION__" [!!!] Exception thrown\n");
     }
-
-    /*if (!NT_SUCCESS(status)) {
-        DbgPrint(DRIVER_PREFIX __FUNCTION__" [!!!] Failed to retrieve file size, status: %X\n", status);
-    }*/
     return status;
 }
 
@@ -108,11 +100,9 @@ NTSTATUS FileUtil::GetFileSize(HANDLE hFile, LONGLONG& FileSize)
 LONGLONG FileUtil::GetFileIdByPath(PUNICODE_STRING FileName)
 {
     if (!FileName || !FileName->Buffer || !FileName->Length) {
-        //DbgPrint(DRIVER_PREFIX "[!!!] Invalid name passed\n");
         return (FILE_INVALID_FILE_ID);
     }
     if (KeGetCurrentIrql() != PASSIVE_LEVEL) {
-        //DbgPrint(DRIVER_PREFIX "[!!$] Failed to open file by NAME: %S: IRQL is non passive\n", FileName->Buffer);
         return (FILE_INVALID_FILE_ID);
     }
     OBJECT_ATTRIBUTES objAttr;

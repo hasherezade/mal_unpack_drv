@@ -20,7 +20,6 @@
 #define ALTITUDE_REGISTRY_FILTER L"7657.124"
 
 #define SUPPORTED_CLIENT_NAME L"\\mal_unpack.exe"
-#define ONLY_SUPPORTED_CLIENT
 
 #define IO_METHOD_FROM_CTL_CODE(cltCode) (cltCode & 0x00000003)
 
@@ -45,6 +44,7 @@ bool _AddProcessToParent(ULONG PID, ULONG ParentPID)
 void _OnProcessCreation(_Inout_ PEPROCESS Process, _In_ HANDLE ProcessId, _Inout_opt_ PPS_CREATE_NOTIFY_INFO CreateInfo)
 {
 	UNREFERENCED_PARAMETER(Process);
+
 	const ULONG creatorPID = HandleToULong(PsGetCurrentProcessId()); //the PID creating the thread
 	USHORT commandLineSize = 0;
 	if (CreateInfo->CommandLine) {
@@ -198,11 +198,12 @@ void MyDriverUnload(_In_ PDRIVER_OBJECT DriverObject)
 	}
 }
 
-
-NTSTATUS HandleCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
+#define _ONLY_SUPPORTED_CLIENT
+NTSTATUS HandleCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+{
 	UNREFERENCED_PARAMETER(DeviceObject);
 
-#ifdef  ONLY_SUPPORTED_CLIENT
+#ifdef _ONLY_SUPPORTED_CLIENT
 	NTSTATUS openStatus = STATUS_ACCESS_DENIED;
 	const ULONG sourcePID = HandleToULong(PsGetCurrentProcessId()); //the PID of the process performing the operation
 	
@@ -393,7 +394,7 @@ NTSTATUS HandleDeviceControl(PDEVICE_OBJECT, PIRP Irp)
 			status = AddProcessWatch(Irp);
 			break;
 		}
-#ifdef ALLOW_DELETE
+#ifdef _ALLOW_DELETE
 		case IOCTL_MUNPACK_COMPANION_REMOVE_FROM_WATCHED:
 		{
 			status = RemoveProcessWatch(Irp);
