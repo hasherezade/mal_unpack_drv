@@ -105,7 +105,7 @@ void OnThreadNotify(HANDLE ProcessId, HANDLE Thread, BOOLEAN Create)
 void OnImageLoadNotify(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_INFO ImageInfo)
 {
 	if (ProcessId == nullptr) {
-		// system image, ignore
+		// system process, ignore
 		return;
 	}
 #ifdef _RETRIEVE_PATH
@@ -556,7 +556,7 @@ DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 		return STATUS_NOT_SUPPORTED;
 	}
 
-	// init used datastructures:
+	// init settings:
 	g_Settings.init();
 
 	//
