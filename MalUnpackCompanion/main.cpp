@@ -44,21 +44,23 @@ bool _AddProcessToParent(ULONG PID, ULONG ParentPID)
 void _OnProcessCreation(_Inout_ PEPROCESS Process, _In_ HANDLE ProcessId, _Inout_opt_ PPS_CREATE_NOTIFY_INFO CreateInfo)
 {
 	UNREFERENCED_PARAMETER(Process);
+	const ULONG PID = HandleToULong(ProcessId);
 
-	const ULONG creatorPID = HandleToULong(PsGetCurrentProcessId()); //the PID creating the thread
 	USHORT commandLineSize = 0;
 	if (CreateInfo->CommandLine) {
 		commandLineSize = CreateInfo->CommandLine->Length;
 	}
 
-	ULONG PID = HandleToULong(ProcessId);
-	bool isAdded = _AddProcessToParent(PID, creatorPID);
+	ULONG ParentPID = HandleToULong(CreateInfo->ParentProcessId);
+	bool isAdded = _AddProcessToParent(PID, ParentPID);
 	if (isAdded && commandLineSize) {
 		DbgPrint(DRIVER_PREFIX "Added: [%d] -> %S\n", PID, CreateInfo->CommandLine->Buffer);
+		return;
 	}
-	ULONG ParentPID = HandleToULong(CreateInfo->ParentProcessId);
+
+	const ULONG creatorPID = HandleToULong(PsGetCurrentProcessId()); //the PID creating the thread
 	if (ParentPID != creatorPID) {
-		_AddProcessToParent(PID, ParentPID);
+		_AddProcessToParent(PID, creatorPID);
 		if (isAdded && commandLineSize) {
 			DbgPrint(DRIVER_PREFIX "Added: [%d] -> %S\n", PID, CreateInfo->CommandLine->Buffer);
 		}
