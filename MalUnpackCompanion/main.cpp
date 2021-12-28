@@ -50,20 +50,15 @@ void _OnProcessCreation(_Inout_ PEPROCESS Process, _In_ HANDLE ProcessId, _Inout
 	if (CreateInfo->CommandLine) {
 		commandLineSize = CreateInfo->CommandLine->Length;
 	}
-
-	ULONG ParentPID = HandleToULong(CreateInfo->ParentProcessId);
+	const ULONG ParentPID = HandleToULong(CreateInfo->ParentProcessId);
 	bool isAdded = _AddProcessToParent(PID, ParentPID);
-	if (isAdded && commandLineSize) {
-		DbgPrint(DRIVER_PREFIX "Added: [%d] -> %S\n", PID, CreateInfo->CommandLine->Buffer);
-		return;
-	}
 
 	const ULONG creatorPID = HandleToULong(PsGetCurrentProcessId()); //the PID creating the thread
-	if (ParentPID != creatorPID) {
-		_AddProcessToParent(PID, creatorPID);
-		if (isAdded && commandLineSize) {
-			DbgPrint(DRIVER_PREFIX "Added: [%d] -> %S\n", PID, CreateInfo->CommandLine->Buffer);
-		}
+	if (!isAdded && (ParentPID != creatorPID)) {
+		isAdded = _AddProcessToParent(PID, creatorPID);
+	}
+	if (isAdded && commandLineSize) {
+		DbgPrint(DRIVER_PREFIX "Added: [%d] -> %S\n", PID, CreateInfo->CommandLine->Buffer);
 	}
 }
 
