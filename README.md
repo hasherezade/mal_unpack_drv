@@ -1,5 +1,5 @@
 # mal_unpack_drv
-MalUnpack companion driver
+MalUnpack companion driver: enhances capabilities of [mal_unpack](https://github.com/hasherezade/mal_unpack), isolates the run sample from the environment.
 
 Works with: https://github.com/hasherezade/mal_unpack
 
