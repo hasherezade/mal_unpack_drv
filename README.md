@@ -8,7 +8,7 @@ Works with: https://github.com/hasherezade/mal_unpack
 How to install
 ---
 
-1. Enable testsigning on your Virtual Machine, where the driver will be installed:
+1. Enable testsigning on your Virtual Machine where the driver will be installed. As an Administrator, deploy the following command:
 
 ```
 bcdedit /set testsigning on
