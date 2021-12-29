@@ -39,7 +39,7 @@ fltmc unload MalUnpackCompanion
 ##  How to update
 
 1. Unload the driver (check [How to unload](https://github.com/hasherezade/mal_unpack_drv/blob/main/README.md#how-to-unload))
-2. Repeat the installation steps (check [How to install](https://github.com/hasherezade/mal_unpack_drv/blob/main/README.md#how-to-install))
+2. Repeat the installation steps 2 to 3 (check [How to install](https://github.com/hasherezade/mal_unpack_drv/blob/main/README.md#how-to-install))
 
 ## Confirm that the driver is loaded
 
