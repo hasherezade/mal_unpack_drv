@@ -24,7 +24,7 @@ bcdedit /set testsigning on
 Then reboot the system...
 
 2. Right click on `MalUnpackCompanion.inf` from the driver package. From the context menu, choose "Install"
-3. After the driver is installed, it remains unactive. In order to activate it, run the following command as Administrator:
+3. After the driver is installed, it remains inactive. In order to activate it, run the following command as Administrator:
 ```
 fltmc load MalUnpackCompanion
 ```
