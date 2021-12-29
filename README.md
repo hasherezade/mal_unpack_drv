@@ -8,7 +8,7 @@ Works with: https://github.com/hasherezade/mal_unpack
 ## How to install
 
 
-1. Enable testsigning on your Virtual Machine where the driver will be installed. As an Administrator, deploy the following command:
+1. The driver is signed by a test signature, so, in order for the installation to succeed, Test Signing must be enabled on the target machine. As an Administrator, deploy the following command:
 
 ```
 bcdedit /set testsigning on
@@ -17,7 +17,7 @@ bcdedit /set testsigning on
 Then reboot the system...
 
 2. Right click on `MalUnpackCompanion.inf` from the driver package. From the context menu, choose "Install"
-3. Run the commandline as Administrator. Deploy the command:
+3. After the driver is installed, it remains unactive. In order to activate it, run the following command as Administrator:
 ```
 fltmc load MalUnpackCompanion
 ```
