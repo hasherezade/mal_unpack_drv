@@ -53,7 +53,7 @@ You should see `MalUnpackCompanion` on the list of installed filter drivers.
 
 #### Option 2.
 
-Install Nirsoft DriversList (available [here](https://www.nirsoft.net/utils/installed_drivers_list.html)). Check if `MalUnpackCompanion` is on the list, and if it is running. This tool allows you also to easily check the current version of the installed driver.
+Install Nirsoft DriversList (available [here](https://www.nirsoft.net/utils/installed_drivers_list.html)). Check if `MalUnpackCompanion` is on the list, and if it is running. This tool allows you also to easily check the version of the currently installed driver.
 
 How to use
 ---
