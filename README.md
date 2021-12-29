@@ -5,8 +5,8 @@ Works with: https://github.com/hasherezade/mal_unpack
 
 **WARNING: This is an experimental version, use it on a Virtual Machine only!**
 
-How to install
----
+## How to install
+
 
 1. Enable testsigning on your Virtual Machine where the driver will be installed. As an Administrator, deploy the following command:
 
@@ -22,15 +22,19 @@ Then reboot the system...
 fltmc load MalUnpackCompanion
 ```
 
-How to unload
----
+## How to unload
+
 Run the commandline as Administrator. Deploy the command:
 ```
 fltmc unload MalUnpackCompanion
 ```
 
-Confirm that the driver is loaded
----
+##  How to update
+
+1. Unload the driver
+2. Repeat the installation steps
+
+## Confirm that the driver is loaded
 
 #### Option 1.
 
