@@ -1,4 +1,4 @@
-# mal_unpack_drv
+# MalUnpackCompanion driver
 
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://github.com/hasherezade/mal_unpack_drv/blob/main/LICENSE)
 [![Platform Badge](https://img.shields.io/badge/Windows-0078D6?logo=windows)](https://github.com/hasherezade/mal_unpack_drv)
