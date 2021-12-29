@@ -1,7 +1,14 @@
 # mal_unpack_drv
+
+[![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
+[![Platform Badge](https://img.shields.io/badge/Windows-0078D6?logo=windows)](https://github.com/hasherezade/mal_unpack_drv)
+
 MalUnpack companion driver: enhances capabilities of [mal_unpack](https://github.com/hasherezade/mal_unpack), isolates the run sample from the environment.
 
 Works with: https://github.com/hasherezade/mal_unpack
+
+
+Supported systems: Windows, starting from 7. Recommended system: Windows 10.
 
 **WARNING: This is an experimental version, use it on a Virtual Machine only!**
 
