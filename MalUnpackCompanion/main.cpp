@@ -143,7 +143,7 @@ void OnImageLoadNotify(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_I
 	}
 }
 
-void UnregisterCallbacks()
+void _UnregisterCallbacks()
 {
 	if (g_Settings.RegHandle) {
 		ObUnRegisterCallbacks(g_Settings.RegHandle);
@@ -177,7 +177,7 @@ void MyDriverUnload(_In_ PDRIVER_OBJECT DriverObject)
 		g_Settings.hasProcessNotify = false;
 	}
 
-	UnregisterCallbacks();
+	_UnregisterCallbacks();
 
 	if (g_Settings.hasLink) {
 		UNICODE_STRING symLink = RTL_CONSTANT_STRING(MY_DRIVER_LINK);
@@ -523,14 +523,6 @@ NTSTATUS _InitializeDriver(_In_ PDRIVER_OBJECT DriverObject)
 		DbgPrint(DRIVER_PREFIX "failed to set image notify callback (status=%08X)\n", status);
 		return status;
 	}
-
-	if (!Data::AllocGlobals()) {
-		DbgPrint(DRIVER_PREFIX "Failed to initialize global data structures\n");
-		return STATUS_UNSUCCESSFUL;
-	}
-	else {
-		DbgPrint(DRIVER_PREFIX "Initialized global data structures!\n");
-	}
 	return STATUS_SUCCESS;
 }
 
@@ -553,8 +545,16 @@ DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 		return STATUS_NOT_SUPPORTED;
 	}
 
-	// init settings:
+	// init all global data:
 	g_Settings.init();
+
+	if (!Data::AllocGlobals()) {
+		DbgPrint(DRIVER_PREFIX "Failed to initialize global data structures\n");
+		return STATUS_FATAL_MEMORY_EXHAUSTION;
+	}
+	else {
+		DbgPrint(DRIVER_PREFIX "Initialized global data structures!\n");
+	}
 
 	//
 	//  Register with FltMgr to tell it our callback routines
@@ -569,13 +569,13 @@ DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 		status = FltStartFiltering(g_Settings.gFilterHandle);
 	}
 	if (!NT_SUCCESS(status)) {
-		UnregisterCallbacks();
+		MyDriverUnload(DriverObject);
 		return status;
 	}
 
 	status = RegisterCallbacks(DriverObject);
 	if (!NT_SUCCESS(status)) {
-		UnregisterCallbacks();
+		MyDriverUnload(DriverObject);
 		return status;
 	}
 
