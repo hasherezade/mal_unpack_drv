@@ -1,6 +1,7 @@
 # MalUnpackCompanion driver
 
 [![GitHub release](https://img.shields.io/github/release/hasherezade/mal_unpack_drv.svg)](https://github.com/hasherezade/mal_unpack_drv/releases)
+[![Github All Releases](https://img.shields.io/github/downloads/hasherezade/mal_unpack_drv/total.svg)](https://github.com/hasherezade/mal_unpack_drv/releases)
 [![Github Latest Release](https://img.shields.io/github/downloads/hasherezade/mal_unpack_drv/latest/total.svg)](https://github.com/hasherezade/mal_unpack_drv/releases)
 
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://github.com/hasherezade/mal_unpack_drv/blob/main/LICENSE)
