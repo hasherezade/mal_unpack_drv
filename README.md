@@ -1,4 +1,5 @@
 # MalUnpackCompanion driver
+[![Last Commit](https://img.shields.io/github/last-commit/hasherezade/mal_unpack_drv/main)](https://github.com/hasherezade/mal_unpack_drv/commits)
 
 [![GitHub release](https://img.shields.io/github/release/hasherezade/mal_unpack_drv.svg)](https://github.com/hasherezade/mal_unpack_drv/releases)
 [![Github All Releases](https://img.shields.io/github/downloads/hasherezade/mal_unpack_drv/total.svg)](https://github.com/hasherezade/mal_unpack_drv/releases)
