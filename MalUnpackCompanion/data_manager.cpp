@@ -64,12 +64,6 @@ t_add_status Data::AddFile(LONGLONG fileId, ULONG parentPid)
 	return g_ProcessNode.AddFile(fileId, parentPid);
 }
 
-bool Data::SetRootFile(ULONG rootPid, LONGLONG fileId)
-{
-	return g_ProcessNode.SetRootFile(rootPid, fileId);
-}
-
-
 t_add_status Data::AddProcess(ULONG pid, ULONG parentPid)
 {
 	t_add_status status = g_ProcessNode.AddProcess(pid, parentPid);

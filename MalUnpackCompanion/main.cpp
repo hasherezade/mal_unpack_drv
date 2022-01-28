@@ -273,10 +273,9 @@ t_add_status _AddProcessWatch(ULONG PID, ULONGLONG FileId = FILE_INVALID_FILE_ID
 
 	DbgPrint(DRIVER_PREFIX ": Watching process requested %d\n", PID);
 	t_add_status add_status = Data::AddProcess(PID, 0);
-	if (add_status == ADD_OK && FileId != FILE_INVALID_FILE_ID) {
-		if (Data::SetRootFile(PID, FileId)) {
-			DbgPrint(DRIVER_PREFIX ": Watching process file %llx\n", FileId);
-		}
+	if (status == ADD_OK && FileId != FILE_INVALID_FILE_ID) {
+		Data::AddFile(FileId, PID);
+		DbgPrint(DRIVER_PREFIX ": Watching process file %lx\n", FileId);
 	}
 	return add_status;
 }

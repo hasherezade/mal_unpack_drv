@@ -1,17 +1,7 @@
 #include "process_data_struct.h"
 
-void ProcessNode::_setRootFile(LONGLONG fileId)
-{
-	this->rootFile = fileId;
-}
-
 bool ProcessNode::_containsFile(LONGLONG fileId)
 {
-	if (this->rootFile != FILE_INVALID_FILE_ID 
-		&& this->rootFile == fileId)
-	{
-		return true;
-	}
 	if (!filesList) return false;
 	return filesList->containsItem(fileId);
 }
