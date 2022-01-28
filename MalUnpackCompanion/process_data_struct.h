@@ -13,6 +13,7 @@ struct ProcessNode
 
 protected:
 	ULONG rootPid;
+	LONGLONG rootFile;
 	ItemsList<ULONG> *processList;
 	ItemsList<LONGLONG> *filesList;
 
@@ -21,6 +22,7 @@ protected:
 		processList = NULL;
 		filesList = NULL;
 		rootPid = _pid;
+		rootFile = FILE_INVALID_FILE_ID;
 	}
 
 	bool _initItems()
@@ -82,6 +84,9 @@ protected:
 
 	// check it the root process terminated
 	bool _isDeadNode();
+
+	// set the file from which the main image was loaded (optional)
+	void _setRootFile(LONGLONG fileId);
 
 	bool _containsFile(LONGLONG fileId);
 
@@ -187,6 +192,25 @@ public:
 		newItem->_destroy();
 		ItemCount--;
 		return ADD_LIMIT_EXHAUSTED;
+	}
+
+	bool SetRootFile(ULONG pid, LONGLONG fileId)
+	{
+		if (0 == pid || FILE_INVALID_FILE_ID == fileId) {
+			return false;
+		}
+
+		AutoLock<FastMutex> lock(Mutex);
+
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n.rootPid == pid) {
+				n._setRootFile(fileId);
+				return true;
+			}
+		}
+		return false;
 	}
 
 	bool CanAddFile(ULONG parentPid)
