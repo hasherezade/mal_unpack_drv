@@ -8,8 +8,14 @@
 #define MY_DRIVER_LINK L"\\??\\MalUnpackCompanion"
 
 struct ProcessData {
-	unsigned long Id;
+	ULONG Id;
 };
+
+struct ProcessDataEx {
+	ULONG Id;
+	LONGLONG fileId;
+};
+
 
 #define MUNPACK_COMPANION_DEVICE 0x8000
 

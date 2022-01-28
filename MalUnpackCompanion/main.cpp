@@ -227,7 +227,7 @@ NTSTATUS HandleCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	return openStatus;
 }
 
-NTSTATUS FetchInputBuffer(PIRP Irp, ProcessData** inpData)
+NTSTATUS FetchInputBuffer(PIRP Irp, void** inpData, size_t inpDataSize)
 {
 	if (!Irp || inpData == nullptr) {
 		return STATUS_UNSUCCESSFUL;
@@ -236,16 +236,16 @@ NTSTATUS FetchInputBuffer(PIRP Irp, ProcessData** inpData)
 	ULONG method = IO_METHOD_FROM_CTL_CODE(stack->Parameters.DeviceIoControl.IoControlCode);
 
 	if (method == METHOD_BUFFERED) {
-		if (stack->Parameters.DeviceIoControl.InputBufferLength < sizeof(ProcessData)) {
+		if (stack->Parameters.DeviceIoControl.InputBufferLength < inpDataSize) {
 			return STATUS_BUFFER_TOO_SMALL;
 		}
-		*inpData = (ProcessData*)Irp->AssociatedIrp.SystemBuffer;
+		*inpData = Irp->AssociatedIrp.SystemBuffer;
 	}
 	else if (method == METHOD_NEITHER) {
-		if (stack->Parameters.DeviceIoControl.InputBufferLength < sizeof(ProcessData)) {
+		if (stack->Parameters.DeviceIoControl.InputBufferLength < inpDataSize) {
 			return STATUS_BUFFER_TOO_SMALL;
 		}
-		*inpData = (ProcessData*)stack->Parameters.DeviceIoControl.Type3InputBuffer;
+		*inpData = stack->Parameters.DeviceIoControl.Type3InputBuffer;
 	}
 	else {
 		return STATUS_NOT_SUPPORTED;
@@ -265,10 +265,7 @@ t_add_status _AddProcessWatch(ULONG PID, ULONGLONG FileId = FILE_INVALID_FILE_ID
 		DbgPrint(DRIVER_PREFIX ": Such process does not exist: %d\n", PID);
 		return t_add_status::ADD_INVALID_ITEM;
 	}
-	// watch also the process module:
-	if (FileId == FILE_INVALID_FILE_ID) {
-		FileId = ProcessUtil::GetProcessFileId(Process);
-	}
+
 	ObDereferenceObject(Process);
 
 	DbgPrint(DRIVER_PREFIX ": Watching process requested %d\n", PID);
@@ -280,16 +277,32 @@ t_add_status _AddProcessWatch(ULONG PID, ULONGLONG FileId = FILE_INVALID_FILE_ID
 	return add_status;
 }
 
+NTSTATUS FetchProcessData(PIRP Irp, ULONG& pid, LONGLONG& fileId)
+{
+	ProcessDataEx* inpDataEx = nullptr;
+	NTSTATUS status = FetchInputBuffer(Irp, (void**)&inpDataEx, sizeof(ProcessDataEx));
+	if (NT_SUCCESS(status)) {
+		pid = inpDataEx->Id;
+		fileId = inpDataEx->fileId;
+		return status;
+	}
+	ProcessData* inpData = nullptr;
+	status = FetchInputBuffer(Irp, (void**)&inpData, sizeof(ProcessData));
+	if (NT_SUCCESS(status)) {
+		pid = inpData->Id;
+	}
+	return status;
+}
+
 NTSTATUS AddProcessWatch(PIRP Irp)
 {
-	ProcessData* inpData = nullptr;
-	NTSTATUS status = FetchInputBuffer(Irp, &inpData);
+	ULONG pid = 0;
+	LONGLONG fileId = FILE_INVALID_FILE_ID;
+	NTSTATUS status = FetchProcessData(Irp, pid, fileId);
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
-
-	ULONG pid = inpData->Id;
-	const t_add_status ret = _AddProcessWatch(pid);
+	const t_add_status ret = _AddProcessWatch(pid, fileId);
 	switch (ret) {
 		case ADD_OK:
 		case ADD_ALREADY_EXIST:
@@ -307,7 +320,7 @@ NTSTATUS RemoveProcessWatch(PIRP Irp)
 {
 	ProcessData* inpData = nullptr;
 
-	NTSTATUS status = FetchInputBuffer(Irp, &inpData);
+	NTSTATUS status = FetchInputBuffer(Irp, (void**)&inpData, sizeof(ProcessData));
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
@@ -333,7 +346,7 @@ NTSTATUS TerminateWatched(PIRP Irp)
 {
 	ProcessData* inpData = nullptr;
 
-	NTSTATUS status = FetchInputBuffer(Irp, &inpData);
+	NTSTATUS status = FetchInputBuffer(Irp, (void**)&inpData, sizeof(ProcessData));
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
@@ -343,7 +356,7 @@ NTSTATUS TerminateWatched(PIRP Irp)
 NTSTATUS _CopyWatchedList(PIRP Irp, ULONG_PTR& outLen, bool files)
 {
 	ProcessData* inpData = nullptr;
-	NTSTATUS status = FetchInputBuffer(Irp, &inpData);
+	NTSTATUS status = FetchInputBuffer(Irp, (void**)&inpData, sizeof(ProcessData));
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
