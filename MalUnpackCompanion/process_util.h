@@ -8,6 +8,8 @@ namespace ProcessUtil {
 
     bool ShowProcessPath(const PEPROCESS Process);
 
+    ULONGLONG GetProcessFileId(const PEPROCESS Process);
+
     ULONG GetProcessParentPID(const PEPROCESS Process);
 
     NTSTATUS TerminateProcess(ULONG PID);

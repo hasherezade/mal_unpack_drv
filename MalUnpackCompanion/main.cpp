@@ -256,9 +256,8 @@ NTSTATUS FetchInputBuffer(PIRP Irp, ProcessData** inpData)
 	return STATUS_SUCCESS; 
 }
 
-
 //---
-t_add_status _AddProcessWatch(ULONG PID)
+t_add_status _AddProcessWatch(ULONG PID, ULONGLONG FileId = FILE_INVALID_FILE_ID)
 {
 	PEPROCESS Process;
 	NTSTATUS status = PsLookupProcessByProcessId(ULongToHandle(PID), &Process);
@@ -266,10 +265,19 @@ t_add_status _AddProcessWatch(ULONG PID)
 		DbgPrint(DRIVER_PREFIX ": Such process does not exist: %d\n", PID);
 		return t_add_status::ADD_INVALID_ITEM;
 	}
+	// watch also the process module:
+	if (FileId == FILE_INVALID_FILE_ID) {
+		FileId = ProcessUtil::GetProcessFileId(Process);
+	}
 	ObDereferenceObject(Process);
 
 	DbgPrint(DRIVER_PREFIX ": Watching process requested %d\n", PID);
-	return Data::AddProcess(PID, 0);
+	t_add_status add_status = Data::AddProcess(PID, 0);
+	if (status == ADD_OK && FileId != FILE_INVALID_FILE_ID) {
+		Data::AddFile(FileId, PID);
+		DbgPrint(DRIVER_PREFIX ": Watching process file %lx\n", FileId);
+	}
+	return add_status;
 }
 
 NTSTATUS AddProcessWatch(PIRP Irp)
@@ -282,13 +290,12 @@ NTSTATUS AddProcessWatch(PIRP Irp)
 
 	ULONG pid = inpData->Id;
 	const t_add_status ret = _AddProcessWatch(pid);
-
 	switch (ret) {
-	case ADD_OK:
-	case ADD_ALREADY_EXIST:
-		return STATUS_SUCCESS;
-	case ADD_INVALID_ITEM:
-		return STATUS_INVALID_PARAMETER;
+		case ADD_OK:
+		case ADD_ALREADY_EXIST:
+			return STATUS_SUCCESS;
+		case ADD_INVALID_ITEM:
+			return STATUS_INVALID_PARAMETER;
 	}
 	const int count = Data::CountProcessTrees();
 	DbgPrint(DRIVER_PREFIX "[!][%zd] Failed to add process to the list. Watched nodes = %zd, add status = %d\n", pid, count, ret);

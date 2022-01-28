@@ -1,5 +1,7 @@
 #include "process_util.h"
 #include "data_structs.h"
+#include "file_util.h"
+
 #include "common.h"
 
 namespace ProcessUtil {
@@ -55,6 +57,34 @@ bool ProcessUtil::CheckProcessPath(const PEPROCESS Process, PWCH supportedName)
 	return allowAccess;
 }
 
+ULONGLONG ProcessUtil::GetProcessFileId(const PEPROCESS Process)
+{
+	LONGLONG fileID = FILE_INVALID_FILE_ID;
+
+	bool isCurrentProcess = false;
+	HANDLE hProcess = NULL;
+	NTSTATUS status = ProcessUtil::RetrieveProcessHandle(Process, isCurrentProcess, hProcess);
+	if (!NT_SUCCESS(status)) {
+		return false;
+	}
+
+	ULONG size = 300;
+	UNICODE_STRING* processName = (UNICODE_STRING*)ExAllocatePoolWithTag(PagedPool, size, DRIVER_TAG);
+
+	if (processName) {
+		RtlZeroMemory(processName, size);	// ensure string will be NULL-terminated
+		status = ZwQueryInformationProcess(hProcess, ProcessImageFileName, processName, size - sizeof(WCHAR), nullptr);
+		if (NT_SUCCESS(status)) {
+			fileID = FileUtil::GetFileIdByPath(processName);
+		}
+		
+		ExFreePool(processName);
+	}
+	if (!isCurrentProcess) {
+		ZwClose(hProcess);
+	}
+	return fileID;
+}
 
 bool ProcessUtil::ShowProcessPath(const PEPROCESS Process)
 {
