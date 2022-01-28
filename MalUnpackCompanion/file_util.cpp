@@ -112,7 +112,16 @@ LONGLONG FileUtil::GetFileIdByPath(PUNICODE_STRING FileName)
     {
         HANDLE hFile;
         IO_STATUS_BLOCK ioStatusBlock;
-        NTSTATUS status = ZwCreateFile(&hFile, SYNCHRONIZE | FILE_READ_ATTRIBUTES, &objAttr, &ioStatusBlock, NULL, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, FILE_OPEN, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0);
+        NTSTATUS status = ZwCreateFile(&hFile, 
+            SYNCHRONIZE | FILE_READ_ATTRIBUTES,
+            &objAttr, &ioStatusBlock, 
+            NULL, 
+            FILE_ATTRIBUTE_NORMAL,
+            FILE_SHARE_READ, FILE_OPEN,
+            FILE_SYNCHRONOUS_IO_NONALERT,
+            NULL,
+            0
+        );
         if (NT_SUCCESS(status)) {
             FetchFileId(hFile, FileId);
             ZwClose(hFile);
