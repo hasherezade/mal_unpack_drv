@@ -55,7 +55,6 @@ bool ProcessUtil::CheckProcessPath(const PEPROCESS Process, PWCH supportedName)
 	return allowAccess;
 }
 
-
 bool ProcessUtil::ShowProcessPath(const PEPROCESS Process)
 {
 	bool isCurrentProcess = false;
@@ -117,7 +116,6 @@ NTSTATUS ProcessUtil::TerminateProcess(ULONG PID)
 
 	return status;
 }
-
 
 ULONG ProcessUtil::GetProcessParentPID(const PEPROCESS Process)
 {
