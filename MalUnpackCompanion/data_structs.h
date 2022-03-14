@@ -70,7 +70,7 @@ void FreeBuffer(T* Items, size_t MaxItemCount = 1, bool clear = false)
 
 	if (MaxItemCount && clear) {
 		const size_t size = MaxItemCount * sizeof(T);
-		::memset(Items, 0, size);
+		RtlSecureZeroMemory(Items, size);
 	}
 	ExFreePool(Items);
 }
