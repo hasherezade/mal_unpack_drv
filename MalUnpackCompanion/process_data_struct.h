@@ -80,7 +80,7 @@ protected:
 		return true;
 	}
 
-	// check it the root process terminated
+	// check if the root process terminated
 	bool _isDeadNode();
 
 	bool _isEmptyNode();
@@ -212,19 +212,63 @@ public:
 		return false;
 	}
 
+	inline bool _DestroyNodeIfEmpty(int i)
+	{
+		ProcessNode& n = Items[i];
+		if (!n._isEmptyNode()) {
+			return false;
+		}
+		n._destroy();
+		//rewrite the last element on the place of the current:
+		if (ItemCount > 1) {
+			Items[i]._copy(Items[ItemCount - 1]);
+		}
+		ItemCount--;
+		deletionEvent.SetEvent();
+		return true;
+	}
+
+	bool DeletePreviousFileAssociation(LONGLONG fileId, ULONG parentPid)
+	{
+		if (0 == parentPid || FILE_INVALID_FILE_ID == fileId) {
+			return true;
+		}
+		AutoLock<FastMutex> lock(Mutex);
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			// this file belongs to a dead node, delete the association first:
+			if (n._containsFile(fileId)) {
+				if (n._isDeadNode() && n._countProcesses() == 0) {
+					n._deleteFile(fileId);
+					_DestroyNodeIfEmpty(i);
+				}
+				return true;
+			}
+		}
+		return false;
+	}
+
 	t_add_status AddFile(LONGLONG fileId, ULONG parentPid)
 	{
 		if (0 == parentPid || FILE_INVALID_FILE_ID == fileId) {
 			return ADD_INVALID_ITEM;
 		}
+		if (!ContainsProcess(parentPid)) {
+			return ADD_INVALID_ITEM;
+		}
+		// this file belongs to a dead node, delete the association first:
+		DeletePreviousFileAssociation(fileId, parentPid);
 
-		AutoLock<FastMutex> lock(Mutex);
-
-		for (int i = 0; i < ItemCount; i++)
+		// add the file to the process:
 		{
-			ProcessNode& n = Items[i];
-			if (n._containsProcess(parentPid)) {
-				return n._addFile(fileId);
+			AutoLock<FastMutex> lock(Mutex);
+			for (int i = 0; i < ItemCount; i++)
+			{
+				ProcessNode& n = Items[i];
+				if (n._containsProcess(parentPid)) {
+					return n._addFile(fileId);
+				}
 			}
 		}
 		return ADD_INVALID_ITEM;
@@ -281,17 +325,8 @@ public:
 			ProcessNode& n = Items[i];
 			if (n._containsProcess(pid)) {
 				if (n._deleteProcess(pid)) {
-					if (n._isEmptyNode()) {
-						//todo: check if all dropped files are deleted
-						n._destroy();
-						//rewrite the last element on the place of the current:
-						if (ItemCount > 1) {
-							Items[i]._copy(Items[ItemCount - 1]);
-						}
-						ItemCount--;
-						deletionEvent.SetEvent();
-						return true;
-					}
+					_DestroyNodeIfEmpty(i);
+					return true;
 				}
 			}
 		}
@@ -300,7 +335,7 @@ public:
 
 	bool DeleteFile(LONGLONG fileId)
 	{
-		if (0 == fileId) return false;
+		if (FILE_INVALID_FILE_ID == fileId) return false;
 
 		AutoLock<FastMutex> lock(Mutex);
 
@@ -309,17 +344,8 @@ public:
 			ProcessNode& n = Items[i];
 			if (n._containsFile(fileId)) {
 				if (n._deleteFile(fileId)) {
-					if (n._isEmptyNode()) {
-						//todo: check if all dropped files are deleted
-						n._destroy();
-						//rewrite the last element on the place of the current:
-						if (ItemCount > 1) {
-							Items[i]._copy(Items[ItemCount - 1]);
-						}
-						ItemCount--;
-						deletionEvent.SetEvent();
-						return true;
-					}
+					_DestroyNodeIfEmpty(i);
+					return true;
 				}
 			}
 		}

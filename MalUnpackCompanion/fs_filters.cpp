@@ -408,6 +408,9 @@ FLT_POSTOP_CALLBACK_STATUS MyPostCleanup(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_
 	}
 	if (fileId != FILE_INVALID_FILE_ID) {
 		DbgPrint(DRIVER_PREFIX __FUNCTION__" >>> The watched file was deleted: %llx\n", fileId);
+		if (Data::DeleteFile(fileId)) {
+			DbgPrint(DRIVER_PREFIX __FUNCTION__" >>> DELETED from the list: %llx\n", fileId);
+		}
 	}
 	return FLT_POSTOP_FINISHED_PROCESSING;
 }
