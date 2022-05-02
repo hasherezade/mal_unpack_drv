@@ -83,6 +83,8 @@ protected:
 	// check it the root process terminated
 	bool _isDeadNode();
 
+	bool _isEmptyNode();
+
 	bool _containsFile(LONGLONG fileId);
 
 	bool _containsProcess(ULONG pid);
@@ -95,7 +97,11 @@ protected:
 
 	int _countProcesses();
 
+	int _countFiles();
+
 	bool _deleteProcess(ULONG pid);
+
+	bool _deleteFile(LONGLONG);
 
 	size_t _copyProcessList(void* data, size_t outBufSize);
 
@@ -275,7 +281,35 @@ public:
 			ProcessNode& n = Items[i];
 			if (n._containsProcess(pid)) {
 				if (n._deleteProcess(pid)) {
-					if (n._countProcesses() == 0) {
+					if (n._isEmptyNode()) {
+						//todo: check if all dropped files are deleted
+						n._destroy();
+						//rewrite the last element on the place of the current:
+						if (ItemCount > 1) {
+							Items[i]._copy(Items[ItemCount - 1]);
+						}
+						ItemCount--;
+						deletionEvent.SetEvent();
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	bool DeleteFile(LONGLONG fileId)
+	{
+		if (0 == fileId) return 0;
+
+		AutoLock<FastMutex> lock(Mutex);
+
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n._containsFile(fileId)) {
+				if (n._deleteFile(fileId)) {
+					if (n._isEmptyNode()) {
+						//todo: check if all dropped files are deleted
 						n._destroy();
 						//rewrite the last element on the place of the current:
 						if (ItemCount > 1) {

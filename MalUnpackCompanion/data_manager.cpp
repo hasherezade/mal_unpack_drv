@@ -87,12 +87,19 @@ t_add_status Data::AddProcessToFileOwner(ULONG PID, LONGLONG fileId)
 int Data::CountProcessTrees()
 {
 	return g_ProcessNode.CountNodes();
-};
+}
 
 
 bool Data::DeleteProcess(ULONG pid)
 {
 	bool isOk = g_ProcessNode.DeleteProcess(pid);
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Watched nodes: %d\n", g_ProcessNode.CountNodes());
+	return isOk;
+}
+
+bool Data::DeleteFile(LONGLONG fileId)
+{
+	bool isOk = g_ProcessNode.DeleteFile(fileId);
 	DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Watched nodes: %d\n", g_ProcessNode.CountNodes());
 	return isOk;
 }

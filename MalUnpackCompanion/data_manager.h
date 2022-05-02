@@ -33,6 +33,8 @@ namespace Data {
 
     bool DeleteProcess(ULONG pid);
 
+    bool DeleteFile(LONGLONG fileId);
+
     size_t CopyProcessList(ULONG rootPid, void* data, size_t outBufSize);
 
     size_t CopyFilesList(ULONG rootPid, void* data, size_t outBufSize);
