@@ -20,6 +20,10 @@ bool ProcessNode::_containsProcess(ULONG pid)
 
 bool ProcessNode::_canAddFile()
 {
+	if (_isDeadNode()) {
+		// the root process terminated, do not allow to add more files to the list
+		return false;
+	}
 	if (!filesList) {
 		if (!_initItems()) {
 			return false;
@@ -30,6 +34,10 @@ bool ProcessNode::_canAddFile()
 
 t_add_status ProcessNode::_addFile(LONGLONG fileId)
 {
+	if (_isDeadNode()) {
+		// the root process terminated, do not allow to add more files to the list
+		return ADD_LIMIT_EXHAUSTED;
+	}
 	if (!filesList) {
 		if (!_initItems()) {
 			return ADD_UNINITIALIZED;
