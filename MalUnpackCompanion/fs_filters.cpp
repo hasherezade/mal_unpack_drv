@@ -376,6 +376,43 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Da
 	return FLT_PREOP_COMPLETE; //finish processing
 }
 
+FLT_POSTOP_CALLBACK_STATUS MyPostCleanup(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID CompletionContext, FLT_POST_OPERATION_FLAGS Flags)
+{
+	UNREFERENCED_PARAMETER(FltObjects);
+	UNREFERENCED_PARAMETER(CompletionContext);
+	UNREFERENCED_PARAMETER(Flags);
+
+	PAGED_CODE();
+
+	LONGLONG fileId = FILE_INVALID_FILE_ID;
+	FileContext* ctx = nullptr;
+	NTSTATUS ctx_status = FltGetFileContext(Data->Iopb->TargetInstance, Data->Iopb->TargetFileObject, (PFLT_CONTEXT*)&ctx);
+	if (NT_SUCCESS(ctx_status) && ctx) {
+		fileId = ctx->fileId;
+		FltReleaseContext(ctx); ctx = nullptr;
+
+		DbgPrint(DRIVER_PREFIX __FUNCTION__" [CTX] Retrieved fileID: %llX\n", fileId);
+		//Data::DeleteFile(fileId);
+	}
+
+	FILE_STANDARD_INFORMATION fileInfo;
+	NTSTATUS status = FltQueryInformationFile(Data->Iopb->TargetInstance,
+		Data->Iopb->TargetFileObject,
+		&fileInfo,
+		sizeof(fileInfo),
+		FileStandardInformation,
+		NULL);
+
+	if (STATUS_FILE_DELETED != status) {
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	}
+	if (fileId != FILE_INVALID_FILE_ID) {
+		DbgPrint(DRIVER_PREFIX __FUNCTION__" >>> The watched file was deleted: %llx\n", fileId);
+	}
+	return FLT_POSTOP_FINISHED_PROCESSING;
+}
+
+
 NTSTATUS
 MyFilterUnload(
 	_In_ FLT_FILTER_UNLOAD_FLAGS Flags
