@@ -14,7 +14,10 @@ bool ProcessNode::_isDeadNode()
 
 bool ProcessNode::_isEmptyNode()
 {
-	if (_isDeadNode() && _countProcesses() == 0 && _countFiles() == 0) {
+	if (_isDeadNode() && _countProcesses() == 0 
+		//&& _countFiles() == 0
+		) 
+	{
 		return true;
 	}
 	return false;

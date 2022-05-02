@@ -280,7 +280,27 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 			DbgPrint(DRIVER_PREFIX "[%llX] file Name: %wZ \n", fileId, fileName);
 		}
 		// assign this file to the process that created it:
-		if (Data::AddFile(fileId, sourcePID) == ADD_LIMIT_EXHAUSTED) {
+		const t_add_status add_status =  Data::AddFile(fileId, sourcePID);
+		if (add_status == ADD_OK) {
+			FileContext* ctx = nullptr; //STATUS_FLT_CONTEXT_ALLOCATION_NOT_FOUND
+			NTSTATUS ctx_status = FltAllocateContext(FltObjects->Filter, FLT_FILE_CONTEXT, sizeof(FileContext), PagedPool, (PFLT_CONTEXT*)&ctx);
+			if (NT_SUCCESS(ctx_status)) {
+				ctx->fileId = fileId;
+				ctx->sourcePID = sourcePID;
+				ctx_status = FltSetFileContext(FltObjects->Instance, FltObjects->FileObject, FLT_SET_CONTEXT_KEEP_IF_EXISTS, ctx, nullptr);
+				if (NT_SUCCESS(ctx_status)) {
+					DbgPrint(DRIVER_PREFIX __FUNCTION__" [CTX][%llX] Attached the context to the file:\n", fileId);
+				}
+				else {
+					DbgPrint(DRIVER_PREFIX __FUNCTION__"[ERR][CTX][%llX] Attaching the context failed: %x\n", fileId, ctx_status);
+				}
+				FltReleaseContext(ctx); ctx = nullptr;
+			}
+			else {
+				DbgPrint(DRIVER_PREFIX __FUNCTION__" [ERR][CTX][%llX] Creating the context failed: %x\n", fileId, ctx_status);
+			}
+		}
+		if (add_status == ADD_LIMIT_EXHAUSTED) {
 			DbgPrint(DRIVER_PREFIX __FUNCTION__" [%llX] Could not add to the files watchlist: limit exhausted\n", fileId);
 		}
 	}
@@ -314,8 +334,18 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Da
 	}
 
 	//get the File ID:
-	LONGLONG fileId;
-	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
+	NTSTATUS fileIdStatus = 0;
+	LONGLONG fileId = FILE_INVALID_FILE_ID;
+	FileContext* ctx = nullptr;
+	NTSTATUS ctx_status = FltGetFileContext(FltObjects->Instance, FltObjects->FileObject, (PFLT_CONTEXT*)&ctx);
+	if (NT_SUCCESS(ctx_status) && ctx) {
+		fileId = ctx->fileId;
+		FltReleaseContext(ctx); ctx = nullptr;
+		DbgPrint(DRIVER_PREFIX "[CTX] Retrieved fileID: %llX\n", fileId);
+	}
+	else {
+		fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
+	}
 
 	const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
 
