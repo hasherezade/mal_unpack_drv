@@ -341,7 +341,9 @@ NTSTATUS _TerminateWatched(ULONG PID)
 		return STATUS_SUCCESS;
 	}
 	NTSTATUS status = ProcessUtil::TerminateProcess(PID);
-	Data::DeleteProcess(PID);
+	if (NT_SUCCESS(status)) {
+		Data::DeleteProcess(PID);
+	}
 	return status;
 }
 
