@@ -296,6 +296,7 @@ NTSTATUS FetchProcessData(PIRP Irp, ULONG& pid, LONGLONG& fileId)
 	return status;
 }
 
+
 NTSTATUS AddProcessWatch(PIRP Irp)
 {
 	ULONG pid = 0;
@@ -400,6 +401,25 @@ NTSTATUS CopyFilesList(PIRP Irp, ULONG_PTR& outLen)
 	return _CopyWatchedList(Irp, outLen, true);
 }
 
+NTSTATUS FetchDriverVersion(PIRP Irp, ULONG_PTR &outLen)
+{
+	const char* versionStr = VER_FILEVERSION_STR;
+	const size_t versionSize = strlen(versionStr) + 1;
+
+	PIO_STACK_LOCATION stack = IoGetCurrentIrpStackLocation(Irp);
+	const size_t outBufSize = stack->Parameters.DeviceIoControl.OutputBufferLength;
+	if (outBufSize < versionSize) {
+		return STATUS_BUFFER_TOO_SMALL;
+	}
+	void* outBuf = Irp->AssociatedIrp.SystemBuffer;
+	if (outBuf == nullptr) {
+		return STATUS_INVALID_PARAMETER;
+	}
+	::memcpy(outBuf, versionStr, versionSize);
+	outLen = versionSize;
+	return STATUS_SUCCESS;
+}
+
 NTSTATUS HandleDeviceControl(PDEVICE_OBJECT, PIRP Irp)
 {
 	PIO_STACK_LOCATION stack = IoGetCurrentIrpStackLocation(Irp);
@@ -408,6 +428,11 @@ NTSTATUS HandleDeviceControl(PDEVICE_OBJECT, PIRP Irp)
 
 	ULONG_PTR outLen = 0;
 	switch (stack->Parameters.DeviceIoControl.IoControlCode) {
+		case IOCTL_MUNPACK_COMPANION_VERSION:
+		{
+			status = FetchDriverVersion(Irp, outLen);
+			break;
+		}
 		case IOCTL_MUNPACK_COMPANION_ADD_TO_WATCHED:
 		{
 			status = AddProcessWatch(Irp);
