@@ -272,7 +272,7 @@ public:
 
 	bool DeleteProcess(ULONG pid)
 	{
-		if (0 == pid) return 0;
+		if (0 == pid) return false;
 
 		AutoLock<FastMutex> lock(Mutex);
 
@@ -290,6 +290,7 @@ public:
 						}
 						ItemCount--;
 						deletionEvent.SetEvent();
+						return true;
 					}
 				}
 			}
@@ -299,7 +300,7 @@ public:
 
 	bool DeleteFile(LONGLONG fileId)
 	{
-		if (0 == fileId) return 0;
+		if (0 == fileId) return false;
 
 		AutoLock<FastMutex> lock(Mutex);
 
@@ -317,6 +318,7 @@ public:
 						}
 						ItemCount--;
 						deletionEvent.SetEvent();
+						return true;
 					}
 				}
 			}
