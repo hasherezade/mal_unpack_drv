@@ -26,13 +26,14 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 
 FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID*);
 
+FLT_PREOP_CALLBACK_STATUS MyPreCleanup(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID*);
 FLT_POSTOP_CALLBACK_STATUS MyPostCleanup(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID CompletionContext, FLT_POST_OPERATION_FLAGS Flags);
 ///
 
 CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
 	{ IRP_MJ_CREATE, 0, MyFilterProtectPreCreate, MyFilterProtectPostCreate },
 	{ IRP_MJ_SET_INFORMATION, 0, MyFilterProtectPreSetInformation, nullptr },
-	{ IRP_MJ_CLEANUP, 0, nullptr, MyPostCleanup},
+	{ IRP_MJ_CLEANUP, 0, MyPreCleanup, MyPostCleanup},
 	{ IRP_MJ_OPERATION_END }
 };
 
