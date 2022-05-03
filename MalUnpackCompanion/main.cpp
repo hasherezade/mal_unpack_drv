@@ -259,8 +259,11 @@ NTSTATUS FetchInputBuffer(PIRP Irp, DATA_BUF** inpData)
 }
 
 //---
-t_add_status _AddProcessWatch(ULONG PID, ULONGLONG FileId = FILE_INVALID_FILE_ID)
+t_add_status _AddProcessWatch(ProcessDataEx &settings)
 {
+	const ULONG PID = settings.Pid;
+	const LONGLONG FileId = settings.fileId;
+
 	PEPROCESS Process;
 	NTSTATUS status = PsLookupProcessByProcessId(ULongToHandle(PID), &Process);
 	if (!NT_SUCCESS(status)) {
@@ -279,33 +282,53 @@ t_add_status _AddProcessWatch(ULONG PID, ULONGLONG FileId = FILE_INVALID_FILE_ID
 	return add_status;
 }
 
-NTSTATUS FetchProcessData(PIRP Irp, ULONG& pid, LONGLONG& fileId)
+NTSTATUS FetchProcessData(PIRP Irp, ProcessDataEx &settings)
 {
-	ProcessDataEx* inpDataEx = nullptr;
-	NTSTATUS status = FetchInputBuffer(Irp, &inpDataEx);
-	if (NT_SUCCESS(status)) {
-		pid = inpDataEx->Id;
-		fileId = inpDataEx->fileId;
-		return status;
+	NTSTATUS status = STATUS_INVALID_PARAMETER;
+	// v2:
+	{
+		ProcessDataEx_v2* inpDataEx2 = nullptr;
+		status = FetchInputBuffer(Irp, &inpDataEx2);
+		if (NT_SUCCESS(status)) {
+			settings.Pid = inpDataEx2->Pid;
+			settings.fileId = inpDataEx2->fileId;
+			settings.noresp = inpDataEx2->noresp;
+			return status;
+		}
 	}
-	ProcessData* inpData = nullptr;
-	status = FetchInputBuffer(Irp, &inpData);
-	if (NT_SUCCESS(status)) {
-		pid = inpData->Id;
+	// v1:
+	{
+		ProcessDataEx_v1* inpDataEx = nullptr;
+		status = FetchInputBuffer(Irp, &inpDataEx);
+		if (NT_SUCCESS(status)) {
+			settings.Pid = inpDataEx->Pid;
+			settings.fileId = inpDataEx->fileId;
+			return status;
+		}
+	}
+	// basic:
+	{
+		ProcessDataBasic* inpData = nullptr;
+		status = FetchInputBuffer(Irp, &inpData);
+		if (NT_SUCCESS(status)) {
+			settings.Pid = inpData->Pid;
+		}
 	}
 	return status;
 }
 
 
+
 NTSTATUS AddProcessWatch(PIRP Irp)
 {
-	ULONG pid = 0;
-	LONGLONG fileId = FILE_INVALID_FILE_ID;
-	NTSTATUS status = FetchProcessData(Irp, pid, fileId);
+	ProcessDataEx settings = { 0 };
+	settings.fileId = FILE_INVALID_FILE_ID;
+
+	NTSTATUS status = FetchProcessData(Irp, settings);
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
-	const t_add_status ret = _AddProcessWatch(pid, fileId);
+	const t_add_status ret = _AddProcessWatch(settings);
 	switch (ret) {
 		case ADD_OK:
 		case ADD_ALREADY_EXIST:
@@ -314,20 +337,20 @@ NTSTATUS AddProcessWatch(PIRP Irp)
 			return STATUS_INVALID_PARAMETER;
 	}
 	const int count = Data::CountProcessTrees();
-	DbgPrint(DRIVER_PREFIX "[!][%zd] Failed to add process to the list. Watched nodes = %zd, add status = %d\n", pid, count, ret);
+	DbgPrint(DRIVER_PREFIX "[!][%zd] Failed to add process to the list. Watched nodes = %zd, add status = %d\n", settings.Pid, count, ret);
 	return STATUS_UNSUCCESSFUL;
 }
 
 
 NTSTATUS RemoveProcessWatch(PIRP Irp)
 {
-	ProcessData* inpData = nullptr;
+	ProcessDataBasic* inpData = nullptr;
 
 	NTSTATUS status = FetchInputBuffer(Irp, &inpData);
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
-	const ULONG PID = inpData->Id;
+	const ULONG PID = inpData->Pid;
 	DbgPrint(DRIVER_PREFIX "Removing process watch: %d\n", PID);
 	if (Data::DeleteProcess(PID)) {
 		DbgPrint(DRIVER_PREFIX "Removed from the list: %d\n", PID);
@@ -349,18 +372,18 @@ NTSTATUS _TerminateWatched(ULONG PID)
 
 NTSTATUS TerminateWatched(PIRP Irp)
 {
-	ProcessData* inpData = nullptr;
+	ProcessDataBasic* inpData = nullptr;
 
 	NTSTATUS status = FetchInputBuffer(Irp, &inpData);
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
-	return _TerminateWatched(inpData->Id);
+	return _TerminateWatched(inpData->Pid);
 }
 
 NTSTATUS _CopyWatchedList(PIRP Irp, ULONG_PTR& outLen, bool files)
 {
-	ProcessData* inpData = nullptr;
+	ProcessDataBasic* inpData = nullptr;
 	NTSTATUS status = FetchInputBuffer(Irp, &inpData);
 	if (!NT_SUCCESS(status)) {
 		return status;
@@ -377,7 +400,7 @@ NTSTATUS _CopyWatchedList(PIRP Irp, ULONG_PTR& outLen, bool files)
 	if (outData == nullptr) {
 		return STATUS_INVALID_PARAMETER;
 	}
-	ULONG parentPid = inpData->Id;
+	ULONG parentPid = inpData->Pid;
 	size_t items = 0;
 	if (files) {
 		items = Data::CopyFilesList(parentPid, outData, outBufSize);

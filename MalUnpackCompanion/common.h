@@ -7,14 +7,22 @@
 #define MY_DEVICE L"\\Device\\MalUnpackCompanion"
 #define MY_DRIVER_LINK L"\\??\\MalUnpackCompanion"
 
-struct ProcessData {
-	ULONG Id;
+struct ProcessDataBasic {
+	ULONG Pid;
 };
 
-struct ProcessDataEx {
-	ULONG Id;
+struct ProcessDataEx_v1 {
+	ULONG Pid;
 	LONGLONG fileId;
 };
+
+struct ProcessDataEx_v2 {
+	ULONG Pid;
+	LONGLONG fileId;
+	ULONG noresp; //respawn protection level
+};
+
+typedef ProcessDataEx_v2 ProcessDataEx;
 
 
 #define MUNPACK_COMPANION_DEVICE 0x8000
