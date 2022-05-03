@@ -224,7 +224,6 @@ public:
 			Items[i]._copy(Items[ItemCount - 1]);
 		}
 		ItemCount--;
-		deletionEvent.SetEvent();
 		return true;
 	}
 
@@ -325,6 +324,9 @@ public:
 			ProcessNode& n = Items[i];
 			if (n._containsProcess(pid)) {
 				if (n._deleteProcess(pid)) {
+					if (n._isDeadNode()) {
+						deletionEvent.SetEvent();
+					}
 					_DestroyNodeIfEmpty(i);
 					return true;
 				}
