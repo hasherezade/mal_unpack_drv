@@ -3,7 +3,7 @@
 
 namespace FltUtil {
 
-	NTSTATUS GetFileId(PCFLT_RELATED_OBJECTS FltObjects, PFLT_CALLBACK_DATA Data, LONGLONG& FileId)
+	NTSTATUS GetFileId(PCFLT_RELATED_OBJECTS FltObjects, PFLT_CALLBACK_DATA Data, LONGLONG& FileId, char *caller)
 	{
 		FileId = FILE_INVALID_FILE_ID;
 
@@ -18,7 +18,7 @@ namespace FltUtil {
 				status != STATUS_OBJECT_NAME_INVALID &&
 				status != STATUS_OBJECT_PATH_NOT_FOUND)
 			{
-				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[!!!] Failed to get filename information, status: %X\n", status);
+				DbgPrint(DRIVER_PREFIX "[!!!][%s] Failed to get filename information, status: %X\n", caller, status);
 			}
 			return status;
 		}
@@ -245,7 +245,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 
 	// Retrieve and check the file ID:
 	LONGLONG fileId = FILE_INVALID_FILE_ID;
-	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
+	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId, __FUNCTION__);
 	//It is NOT a creation of new file, and cannot verify the file ID, so deny the access...
 	if (FILE_INVALID_FILE_ID == fileId) {
 		if ((FILE_OPEN != createDisposition) || (DesiredAccess & all_write)) {
@@ -310,7 +310,7 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 
 	// Retrieve and check the file ID:
 	LONGLONG fileId = FILE_INVALID_FILE_ID;
-	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
+	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId, __FUNCTION__);
 	if (FILE_INVALID_FILE_ID == fileId) {
 		// this should never happend: case handled pre-create
 		return FLT_POSTOP_FINISHED_PROCESSING;
@@ -365,7 +365,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Da
 	NTSTATUS fileIdStatus = 0;
 	LONGLONG fileId = _GetFileIdFromContext(FltObjects->Instance, FltObjects->FileObject,__FUNCTION__);
 	if (fileId == FILE_INVALID_FILE_ID) {
-		fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
+		fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId, __FUNCTION__);
 	}
 
 	const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
@@ -404,7 +404,7 @@ FLT_PREOP_CALLBACK_STATUS MyPreCleanup(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OB
 
 	ULONG fileOwner = 0;
 	LONGLONG fileId = FILE_INVALID_FILE_ID;
-	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId);
+	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId, __FUNCTION__);
 	if (NT_SUCCESS(fileIdStatus)) {
 		fileOwner = Data::GetFileOwner(fileId);
 		if (fileOwner && fileId != FILE_INVALID_FILE_ID) {
