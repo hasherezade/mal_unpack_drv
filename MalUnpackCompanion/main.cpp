@@ -422,6 +422,23 @@ NTSTATUS FetchDriverVersion(PIRP Irp, ULONG_PTR &outLen)
 	return STATUS_SUCCESS;
 }
 
+NTSTATUS CountNodes(PIRP Irp, ULONG_PTR& outLen)
+{
+	auto counter = Data::CountProcessTrees();
+	PIO_STACK_LOCATION stack = IoGetCurrentIrpStackLocation(Irp);
+	const size_t outBufSize = stack->Parameters.DeviceIoControl.OutputBufferLength;
+	if (outBufSize < sizeof(counter)) {
+		return STATUS_BUFFER_TOO_SMALL;
+	}
+	void* outBuf = Irp->AssociatedIrp.SystemBuffer;
+	if (outBuf == nullptr) {
+		return STATUS_INVALID_PARAMETER;
+	}
+	::memcpy(outBuf, &counter, sizeof(counter));
+	outLen = sizeof(counter);
+	return STATUS_SUCCESS;
+}
+
 NTSTATUS HandleDeviceControl(PDEVICE_OBJECT, PIRP Irp)
 {
 	PIO_STACK_LOCATION stack = IoGetCurrentIrpStackLocation(Irp);
@@ -433,6 +450,11 @@ NTSTATUS HandleDeviceControl(PDEVICE_OBJECT, PIRP Irp)
 		case IOCTL_MUNPACK_COMPANION_VERSION:
 		{
 			status = FetchDriverVersion(Irp, outLen);
+			break;
+		}
+		case IOCTL_MUNPACK_COMPANION_COUNT_NODES:
+		{
+			status = CountNodes(Irp, outLen);
 			break;
 		}
 		case IOCTL_MUNPACK_COMPANION_ADD_TO_WATCHED:
