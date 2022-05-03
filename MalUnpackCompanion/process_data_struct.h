@@ -6,7 +6,6 @@
 	#define FILE_INVALID_FILE_ID               ((LONGLONG)-1LL) 
 #endif
 
-
 struct ProcessNode
 {
 	friend struct ProcessNodesList;
@@ -15,12 +14,14 @@ protected:
 	ULONG rootPid;
 	ItemsList<ULONG> *processList;
 	ItemsList<LONGLONG> *filesList;
+	t_noresp respawnProtect;
 
-	void _init(ULONG _pid)
+	void _init(ULONG _pid, t_noresp _respawnProtect)
 	{
 		processList = NULL;
 		filesList = NULL;
 		rootPid = _pid;
+		respawnProtect = _respawnProtect;
 	}
 
 	bool _initItems()
@@ -152,7 +153,7 @@ public:
 		return false;
 	}
 
-	t_add_status AddProcess(ULONG pid, ULONG parentPid)
+	t_add_status AddProcess(ULONG pid, ULONG parentPid, t_noresp respawnProtect)
 	{
 		if (0 == pid) {
 			return ADD_INVALID_ITEM;
@@ -160,22 +161,10 @@ public:
 		//Allow for the parentPid == 0: it means a new root node
 		
 		AutoLock<FastMutex> lock(Mutex);
-		if (parentPid != 0) {
-			for (int i = 0; i < ItemCount; i++)
-			{
-				ProcessNode& n = Items[i];
-				if (n.rootPid == parentPid) {
-					return n._addProcess(pid);
-				}
-			}
 
-			for (int i = 0; i < ItemCount; i++)
-			{
-				ProcessNode& n = Items[i];
-				if (n._containsProcess(parentPid)) {
-					return n._addProcess(pid);
-				}
-			}
+		t_add_status status = _addToExistingTree(pid, parentPid);
+		if (status != ADD_NO_PARENT) {
+			return status; // adding failed
 		}
 
 		//create a new node for the process:
@@ -185,7 +174,7 @@ public:
 			return ADD_LIMIT_EXHAUSTED;
 		}
 		DbgPrint(DRIVER_PREFIX "Adding new root node: %d!\n", pid);
-		newItem->_init(pid);
+		newItem->_init(pid, respawnProtect);
 		if (newItem->_addProcess(pid) == ADD_OK) {
 			return ADD_OK;
 		}
@@ -506,6 +495,35 @@ private:
 	int MaxItemCount;
 	FastMutex Mutex;
 	Event deletionEvent;
+
+	t_add_status _addToExistingTree(ULONG pid, ULONG parentPid)
+	{
+		if (0 == pid) {
+			return ADD_INVALID_ITEM;
+		}
+		if (0 == parentPid) {
+			return ADD_NO_PARENT;
+		}
+
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n.rootPid == parentPid) {
+				return n._addProcess(pid);
+			}
+		}
+
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n._containsProcess(parentPid)) {
+				return n._addProcess(pid);
+			}
+		}
+		
+		// this no parent tree found for such process
+		return ADD_NO_PARENT;
+	}
 
 	bool _destroyItems()
 	{

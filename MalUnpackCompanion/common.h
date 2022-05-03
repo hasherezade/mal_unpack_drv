@@ -7,6 +7,14 @@
 #define MY_DEVICE L"\\Device\\MalUnpackCompanion"
 #define MY_DRIVER_LINK L"\\??\\MalUnpackCompanion"
 
+typedef enum {
+	NORESP_NO_RESTRICTION = 0,
+	NORESP_DROPPED_FILES = 1,
+	NORESP_ALL_FILES = 2,
+	COUNT_NORESP
+} t_noresp;
+
+
 struct ProcessDataBasic {
 	ULONG Pid;
 };
@@ -19,7 +27,7 @@ struct ProcessDataEx_v1 {
 struct ProcessDataEx_v2 {
 	ULONG Pid;
 	LONGLONG fileId;
-	ULONG noresp; //respawn protection level
+	t_noresp noresp; //respawn protection level
 };
 
 typedef ProcessDataEx_v2 ProcessDataEx;

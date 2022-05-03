@@ -273,8 +273,8 @@ t_add_status _AddProcessWatch(ProcessDataEx &settings)
 
 	ObDereferenceObject(Process);
 
-	DbgPrint(DRIVER_PREFIX ": Watching process requested %d\n", PID);
-	t_add_status add_status = Data::AddProcess(PID, 0);
+	DbgPrint(DRIVER_PREFIX ": Watching process requested %d, noresp=%d\n", PID, settings.noresp);
+	t_add_status add_status = Data::AddProcessNode(PID, settings.noresp);
 	if (status == ADD_OK && FileId != FILE_INVALID_FILE_ID) {
 		Data::AddFile(FileId, PID);
 		DbgPrint(DRIVER_PREFIX ": Watching process file %llx\n", FileId);
@@ -316,8 +316,6 @@ NTSTATUS FetchProcessData(PIRP Irp, ProcessDataEx &settings)
 	}
 	return status;
 }
-
-
 
 NTSTATUS AddProcessWatch(PIRP Irp)
 {

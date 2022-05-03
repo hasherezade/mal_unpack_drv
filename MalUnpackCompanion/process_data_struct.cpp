@@ -14,14 +14,16 @@ bool ProcessNode::_isDeadNode()
 
 bool ProcessNode::_isEmptyNode()
 {
-	if (_isDeadNode() 
-		&& _countProcesses() == 0 
-		&& _countFiles() == 0
-		) 
-	{
-		return true;
+	if (!_isDeadNode() || _countProcesses() > 0) {
+		return false;
 	}
-	return false;
+	if (respawnProtect == t_noresp::NORESP_ALL_FILES) {
+		if (_countFiles() > 0) return false;
+	}
+	if (respawnProtect == t_noresp::NORESP_DROPPED_FILES) {
+		if (_countFiles() > 1) return false;
+	}
+	return true;
 }
 
 bool ProcessNode::_containsProcess(ULONG pid)
