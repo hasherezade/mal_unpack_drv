@@ -437,18 +437,26 @@ public:
 		if (0 == pid) return STATUS_INVALID_PARAMETER;
 
 		LONGLONG waitTime = (checkInterval) ? checkInterval->QuadPart : 0;
-		bool isMine = false;
-		// if the given PID is a root, don't let it terminate without permission
+		bool isRoot = false;
+
 		ULONG ownerPID = 0;
 		while ((ownerPID = GetProcessOwner(pid)) == pid) {
-			isMine = true;
+			// if the given PID is a root, don't let it terminate without permission
+			isRoot = true;
 
 			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": process requested terminate, waitTime: %zx (owner: %d, remaining children: %d)\n", pid, waitTime, pid, CountProcesses(pid));
 			deletionEvent.ResetEvent();
 			deletionEvent.WaitForEventSet(checkInterval);
 		}
-		if (isMine) {
-			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": process termination permitted!\n", pid, waitTime, pid);
+		if (isRoot) {
+			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": root process termination permitted!\n", pid, waitTime, pid);
+		}
+
+		if (ownerPID != 0) {
+			// the process is still on the list, so delete it
+			// this may happen in case of a child process that is terminating on its own
+			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": child process termination permitted!\n", pid, waitTime, pid);
+			DeleteProcess(pid);
 		}
 		return STATUS_SUCCESS;
 	}
