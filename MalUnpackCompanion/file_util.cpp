@@ -136,20 +136,18 @@ LONGLONG FileUtil::GetFileIdByPath(PUNICODE_STRING FileName)
     return FileId;
 }
 
-NTSTATUS FileUtil::RequestFileDeletion(LONGLONG FileId)
+NTSTATUS FileUtil::RequestFileDeletion(PUNICODE_STRING FileName)
 {
+    if (!FileName || !FileName->Buffer || !FileName->Length) {
+        return STATUS_INVALID_PARAMETER;
+    }
     if (KeGetCurrentIrql() != PASSIVE_LEVEL) {
         return STATUS_UNSUCCESSFUL;
     }
-    if (FileId == FILE_INVALID_FILE_ID) {
-        return STATUS_INVALID_PARAMETER;
-    }
+
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    UNICODE_STRING ucName = { sizeof(FileId), sizeof(FileId), (PWSTR)FileId };
-
     OBJECT_ATTRIBUTES objAttr;
-    InitializeObjectAttributes(&objAttr, &ucName, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
-
+    InitializeObjectAttributes(&objAttr, FileName, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
     __try
     {
         HANDLE hFile;
@@ -168,17 +166,17 @@ NTSTATUS FileUtil::RequestFileDeletion(LONGLONG FileId)
         if (NT_SUCCESS(status)) {
             FILE_DISPOSITION_INFORMATION disposition = { TRUE };
             status = ZwSetInformationFile(hFile, &ioStatusBlock, &disposition, sizeof(FILE_DISPOSITION_INFORMATION), FileDispositionInformation);
-
-            ZwClose(hFile);
         }
         else {
-            DbgPrint(DRIVER_PREFIX "[!!!][%llx] Failed to set the file for deletion, status %X\n", FileId, status);
+            DbgPrint(DRIVER_PREFIX "[!!!] Failed to set the file for deletion, status %X\n", status);
         }
+        ZwClose(hFile);
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
-        status = STATUS_UNSUCCESSFUL;
+        status = GetExceptionCode();
     }
+    RtlFreeUnicodeString(FileName);
     return STATUS_SUCCESS;
 }
 

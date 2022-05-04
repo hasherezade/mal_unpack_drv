@@ -7,6 +7,8 @@
 #define MY_DEVICE L"\\Device\\MalUnpackCompanion"
 #define MY_DRIVER_LINK L"\\??\\MalUnpackCompanion"
 
+const USHORT MAX_PATH_LEN = 1024;
+
 typedef enum {
 	NORESP_NO_RESTRICTION = 0,
 	NORESP_DROPPED_FILES = 1,
@@ -28,6 +30,11 @@ struct ProcessDataEx_v2 {
 	ULONG Pid;
 	LONGLONG fileId;
 	t_noresp noresp; //respawn protection level
+};
+
+struct ProcessFileData {
+	ULONG Pid;
+	WCHAR FileName[MAX_PATH_LEN];
 };
 
 typedef ProcessDataEx_v2 ProcessDataEx;
