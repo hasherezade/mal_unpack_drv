@@ -12,12 +12,12 @@ struct ProcessNode
 
 protected:
 	ULONG rootPid;
-	ULONGLONG imgFile;
+	LONGLONG imgFile;
 	ItemsList<ULONG> *processList;
 	ItemsList<LONGLONG> *filesList;
 	t_noresp respawnProtect;
 
-	void _init(ULONG _pid, t_noresp _respawnProtect, ULONGLONG _imgFile)
+	void _init(ULONG _pid, t_noresp _respawnProtect, LONGLONG _imgFile)
 	{
 		processList = NULL;
 		filesList = NULL;
@@ -73,13 +73,13 @@ protected:
 			filesList = NULL;
 		}
 		rootPid = 0;
+		imgFile = FILE_INVALID_FILE_ID;
+		respawnProtect = t_noresp::NORESP_NO_RESTRICTION;
 	}
 
 	bool _copy(const ProcessNode& node)
 	{
-		rootPid = node.rootPid;
-		processList = node.processList;
-		filesList = node.filesList;
+		::memcpy(this, &node, sizeof(ProcessNode));
 		return true;
 	}
 
