@@ -382,10 +382,13 @@ NTSTATUS TerminateWatched(PIRP Irp)
 
 NTSTATUS _DeleteWatchedFile(ULONG PID, LONGLONG fileId)
 {
-	if (Data::GetFileOwner(PID) != PID) {
+	const ULONG fileOwnerPid = Data::GetFileOwner(fileId);
+	if (fileOwnerPid != PID) {
 		return STATUS_ACCESS_DENIED;
 	}
-	return FileUtil::RequestFileDeletion(fileId);
+	NTSTATUS status = FileUtil::RequestFileDeletion(fileId);
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ "< FileID = %llx, PID = %d, status = %X\n", fileId, PID, status);
+	return status;
 }
 
 NTSTATUS DeleteWatchedFile(PIRP Irp)

@@ -141,12 +141,15 @@ NTSTATUS FileUtil::RequestFileDeletion(LONGLONG FileId)
     if (KeGetCurrentIrql() != PASSIVE_LEVEL) {
         return STATUS_UNSUCCESSFUL;
     }
+    if (FileId == FILE_INVALID_FILE_ID) {
+        return STATUS_INVALID_PARAMETER;
+    }
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     UNICODE_STRING ucName = { sizeof(FileId), sizeof(FileId), (PWSTR)FileId };
 
     OBJECT_ATTRIBUTES objAttr;
     InitializeObjectAttributes(&objAttr, &ucName, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
-    LONGLONG FileId = FILE_INVALID_FILE_ID;
+
     __try
     {
         HANDLE hFile;
