@@ -227,7 +227,6 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 	if (!Data::ContainsProcess(sourcePID)) {
 		return FLT_PREOP_SUCCESS_NO_CALLBACK; // not a watched process, do not interfere
 	}
-
 	// Check if it is creating a new file:
 	if (FltUtil::IsCreateOrOverwrite(Data, FltObjects)) {
 		// check if adding the file is possible:
@@ -338,6 +337,47 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 	return FLT_POSTOP_FINISHED_PROCESSING;
 }
 
+bool is_delete_operation(FLT_PARAMETERS &Parameters)
+{
+	auto& params = Parameters.SetFileInformation;
+	if (params.FileInformationClass != FileDispositionInformation && params.FileInformationClass != FileDispositionInformationEx) {
+		// not a delete operation
+		return false;
+	}
+	FILE_DISPOSITION_INFORMATION* deleteInfo = (FILE_DISPOSITION_INFORMATION*)params.InfoBuffer;
+	if (deleteInfo->DeleteFile) {
+		return true;
+	}
+	return false;
+}
+
+bool is_file_protection_operation(FLT_PARAMETERS& Parameters)
+{
+	auto& params = Parameters.SetFileInformation;
+	if (params.FileInformationClass != FileBasicInformation) {
+		return false;
+	}
+	FILE_BASIC_INFORMATION* basicInfo = (FILE_BASIC_INFORMATION*)params.InfoBuffer;
+	if (basicInfo->FileAttributes & FILE_ATTRIBUTE_SYSTEM) {
+		return true;
+	}
+	return false;
+}
+
+bool unset_protection(FLT_PARAMETERS& Parameters)
+{
+	auto& params = Parameters.SetFileInformation;
+	if (params.FileInformationClass != FileBasicInformation) {
+		return false;
+	}
+	FILE_BASIC_INFORMATION* basicInfo = (FILE_BASIC_INFORMATION*)params.InfoBuffer;
+	if (basicInfo->FileAttributes & FILE_ATTRIBUTE_SYSTEM) {
+		basicInfo->FileAttributes ^= FILE_ATTRIBUTE_SYSTEM;
+		return true;
+	}
+	return false;
+}
+
 FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID*)
 {
 	UNREFERENCED_PARAMETER(FltObjects);
@@ -346,15 +386,11 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Da
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
 
-	// check if it is a delete operation:
-	auto& params = Data->Iopb->Parameters.SetFileInformation;
-	if (params.FileInformationClass != FileDispositionInformation && params.FileInformationClass != FileDispositionInformationEx) {
-		// not a delete operation
-		return FLT_PREOP_SUCCESS_NO_CALLBACK;
-	}
+	const bool is_deletion = is_delete_operation(Data->Iopb->Parameters);
+	const bool is_protection = is_file_protection_operation(Data->Iopb->Parameters);
 
-	FILE_DISPOSITION_INFORMATION* info = (FILE_DISPOSITION_INFORMATION*)params.InfoBuffer;
-	if (!info->DeleteFile) {
+	// check if it is a delete operation:
+	if (!is_deletion && !is_protection) {
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
 
@@ -373,13 +409,23 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Da
 
 	const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
 
-	// check if the watched process is the ower of this file:
+	// check if the watched process is the owner of this file:
 	if (Data::IsProcessInFileOwners(sourcePID, fileId)) {
 		// report about the operation:
-		DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the OWNED file, fileID: %llX status: %X\n",
-			sourcePID,
-			fileId,
-			fileIdStatus);
+		if (is_deletion) {
+			DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the OWNED file, fileID: %llX status: %X\n",
+				sourcePID,
+				fileId,
+				fileIdStatus);
+		}
+
+		if (is_protection) {
+			unset_protection(Data->Iopb->Parameters);
+			DbgPrint(DRIVER_PREFIX "[%d] Attempted setting protection for the OWNED file, fileID: %llX status: %X\n",
+				sourcePID,
+				fileId,
+				fileIdStatus);
+		}
 
 		if (fileName) {
 			DbgPrint(DRIVER_PREFIX "[%zX] file Name: %wZ \n", fileId, fileName);
@@ -387,7 +433,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreSetInformation(PFLT_CALLBACK_DATA Da
 		return FLT_PREOP_SUCCESS_NO_CALLBACK; //do not interfere
 	}
 
-	DbgPrint(DRIVER_PREFIX "[%d] Attempted setting delete disposition for the NOT-owned file, fileID: %llX status: %X -> ACCESS_DENIED\n",
+	DbgPrint(DRIVER_PREFIX "[%d] Attempted setting disposition for the NOT-owned file, fileID: %llX status: %X -> ACCESS_DENIED\n",
 		sourcePID,
 		fileId,
 		fileIdStatus);
