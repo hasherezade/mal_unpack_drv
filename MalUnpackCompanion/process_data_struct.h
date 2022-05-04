@@ -401,25 +401,6 @@ public:
 		return 0;
 	}
 
-	bool IsAliveRoot(ULONG pid)
-	{
-		if (0 == pid) return 0;
-
-		AutoLock<FastMutex> lock(Mutex);
-
-		for (int i = 0; i < ItemCount; i++)
-		{
-			ProcessNode& n = Items[i];
-			if (n.rootPid == pid) {
-				if (n._isDeadNode()) {
-					return false;
-				}
-				return true;
-			}
-		}
-		return false;
-	}
-
 	bool AreSameFamily(ULONG pid1, ULONG pid2)
 	{
 		if (pid1 == 0 || pid2 == 0) {
@@ -453,12 +434,13 @@ public:
 
 	NTSTATUS WaitForProcessDeletion(ULONG pid, PLARGE_INTEGER checkInterval)
 	{
-		if (0 == pid) return STATUS_SUCCESS;
+		if (0 == pid) return STATUS_INVALID_PARAMETER;
 
 		LONGLONG waitTime = (checkInterval) ? checkInterval->QuadPart : 0;
 		bool isMine = false;
 		// if the given PID is a root, don't let it terminate without permission
-		while (IsAliveRoot(pid)) {
+		ULONG ownerPID = 0;
+		while ((ownerPID = GetProcessOwner(pid)) == pid) {
 			isMine = true;
 
 			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": process requested terminate, waitTime: %zx (owner: %d, remaining children: %d)\n", pid, waitTime, pid, CountProcesses(pid));
