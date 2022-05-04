@@ -216,7 +216,9 @@ public:
 			return canAddStatus;
 		}
 		// if this file belongs to a dead node, delete the association first:
-		if (_deletePreviousFileAssociation(fileId, parentPid) == DELETE_FORBIDDEN) {
+		const t_delete_status delStatus = _deletePreviousFileAssociation(fileId, parentPid);
+		//DbgPrint(DRIVER_PREFIX __FUNCTION__ "_deletePreviousFileAssociation: status= %d, file: %llx, \n",  delStatus, fileId);
+		if (delStatus == DELETE_FORBIDDEN) {
 			return ADD_FORBIDDEN;
 		}
 
@@ -500,6 +502,7 @@ private:
 		DELETE_NOT_FOUND,
 		DELETE_INVALID_ITEM,
 		DELETE_FORBIDDEN,
+		DELETE_EXCLUDED,
 		DELETE_STATES_COUNT
 	} t_delete_status;
 
@@ -520,7 +523,7 @@ private:
 					return DELETE_OK;
 				}
 				if (excludedPid && n._containsProcess(excludedPid)) {
-					break; // file found in the excluded process, so deleting is not required
+					return DELETE_EXCLUDED; // file found in the excluded process, so deleting is not required
 				}
 				//this process tree is not dead
 				return DELETE_FORBIDDEN;
