@@ -331,6 +331,9 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		if (add_status == ADD_LIMIT_EXHAUSTED) {
 			DbgPrint(DRIVER_PREFIX __FUNCTION__" [%llX] Could not add to the files watchlist: limit exhausted\n", fileId);
 		}
+		if (add_status == ADD_FORBIDDEN) {
+			DbgPrint(DRIVER_PREFIX __FUNCTION__" [%llX] Could not add to the file to watchlist: already associated with other process\n", fileId);
+		}
 	}
 	return FLT_POSTOP_FINISHED_PROCESSING;
 }

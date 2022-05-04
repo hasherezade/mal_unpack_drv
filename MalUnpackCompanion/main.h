@@ -5,6 +5,7 @@
 #include <fltKernel.h>
 
 #include "version.h"
+#include "common.h"
 
 typedef struct _active_settings {
 
