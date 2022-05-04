@@ -66,7 +66,7 @@ t_add_status Data::AddFile(LONGLONG fileId, ULONG parentPid)
 
 t_add_status Data::AddProcess(ULONG pid, ULONG parentPid)
 {
-	t_add_status status = g_ProcessNode.AddProcess(pid, parentPid, FILE_INVALID_FILE_ID, t_noresp::NORESP_NO_RESTRICTION);
+	t_add_status status = g_ProcessNode.AddProcess(pid, parentPid);
 	if (status == ADD_LIMIT_EXHAUSTED) {
 		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Cannot add the process: %d, terminating...\n", pid);
 		ProcessUtil::TerminateProcess(pid);
@@ -76,7 +76,7 @@ t_add_status Data::AddProcess(ULONG pid, ULONG parentPid)
 
 t_add_status Data::AddProcessNode(ULONG pid, LONGLONG imgFileId, t_noresp respawnProtect)
 {
-	t_add_status status = g_ProcessNode.AddProcess(pid, 0, imgFileId, respawnProtect);
+	t_add_status status = g_ProcessNode.AddProcessNode(pid, imgFileId, respawnProtect);
 	if (status == ADD_LIMIT_EXHAUSTED) {
 		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Cannot add the process: %d, terminating...\n", pid);
 		ProcessUtil::TerminateProcess(pid);

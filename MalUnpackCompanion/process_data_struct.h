@@ -155,18 +155,26 @@ public:
 		return false;
 	}
 
-	t_add_status AddProcess(ULONG pid, ULONG parentPid, LONGLONG imgFile, t_noresp respawnProtect)
+	t_add_status AddProcess(ULONG pid, ULONG parentPid)
 	{
 		if (0 == pid) {
 			return ADD_INVALID_ITEM;
 		}
-		//Allow for the parentPid == 0: it means a new root node
-		
+		if (0 == parentPid) {
+			return ADD_NO_PARENT;
+		}
 		AutoLock<FastMutex> lock(Mutex);
+		return _addToExistingTree(pid, parentPid);
+	}
 
-		t_add_status status = _addToExistingTree(pid, parentPid);
-		if (status != ADD_NO_PARENT) {
-			return status; // adding failed
+	t_add_status AddProcessNode(ULONG pid, LONGLONG imgFile, t_noresp respawnProtect)
+	{
+		if (0 == pid) {
+			return ADD_INVALID_ITEM;
+		}
+		AutoLock<FastMutex> lock(Mutex);
+		if (_ContainsProcess(pid)) {
+			return ADD_FORBIDDEN;
 		}
 		return _createNewProcessNode(pid, imgFile, respawnProtect);
 	}

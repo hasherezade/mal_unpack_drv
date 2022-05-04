@@ -276,8 +276,9 @@ t_add_status _AddProcessWatch(ProcessDataEx &settings)
 	DbgPrint(DRIVER_PREFIX ": Watching process requested %d, noresp=%d\n", PID, settings.noresp);
 	t_add_status add_status = Data::AddProcessNode(PID, FileId, settings.noresp);
 	if (status == ADD_OK && FileId != FILE_INVALID_FILE_ID) {
-		Data::AddFile(FileId, PID);
-		DbgPrint(DRIVER_PREFIX ": Watching process file %llx\n", FileId);
+		if (Data::AddFile(FileId, PID) == ADD_OK) {
+			DbgPrint(DRIVER_PREFIX ": Watching process file %llx\n", FileId);
+		}
 	}
 	return add_status;
 }
