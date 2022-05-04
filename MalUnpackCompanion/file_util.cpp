@@ -136,6 +136,36 @@ LONGLONG FileUtil::GetFileIdByPath(PUNICODE_STRING FileName)
     return FileId;
 }
 
+NTSTATUS changeFileAttributes(HANDLE hFile)
+{
+    if (!hFile) {
+        return STATUS_UNSUCCESSFUL;
+    }
+    IO_STATUS_BLOCK ioStatusBlock;
+    FILE_BASIC_INFORMATION basicInfo = { 0 };
+    NTSTATUS status = ZwQueryInformationFile(hFile, &ioStatusBlock, &basicInfo, sizeof(FILE_BASIC_INFORMATION), FileBasicInformation);
+    if (!NT_SUCCESS(status)) {
+        return status;
+    }
+    if (basicInfo.FileAttributes & FILE_ATTRIBUTE_SYSTEM) {
+        DbgPrint(DRIVER_PREFIX "[!!!] This file has FILE_ATTRIBUTE_SYSTEM");
+        basicInfo.FileAttributes ^= FILE_ATTRIBUTE_SYSTEM;
+    }
+    if (basicInfo.FileAttributes & FILE_ATTRIBUTE_READONLY) {
+        DbgPrint(DRIVER_PREFIX "[!!!]This file has FILE_ATTRIBUTE_READONLY");
+        basicInfo.FileAttributes ^= FILE_ATTRIBUTE_READONLY;
+    }
+    if (basicInfo.FileAttributes & FILE_ATTRIBUTE_HIDDEN) {
+        DbgPrint(DRIVER_PREFIX "[!!!]This file has FILE_ATTRIBUTE_HIDDEN");
+        basicInfo.FileAttributes ^= FILE_ATTRIBUTE_HIDDEN;
+    }
+    status = ZwSetInformationFile(hFile, &ioStatusBlock, &basicInfo, sizeof(FILE_BASIC_INFORMATION), FileBasicInformation);
+    if (NT_SUCCESS(status)) {
+        status = ioStatusBlock.Status;
+    }
+    return status;
+}
+
 NTSTATUS FileUtil::RequestFileDeletion(LONGLONG FileId)
 {
     if (KeGetCurrentIrql() != PASSIVE_LEVEL) {
@@ -144,7 +174,9 @@ NTSTATUS FileUtil::RequestFileDeletion(LONGLONG FileId)
     if (FileId == FILE_INVALID_FILE_ID) {
         return STATUS_INVALID_PARAMETER;
     }
+    NTSTATUS openStatus = STATUS_UNSUCCESSFUL;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
+    HANDLE hFile = 0;
     UNICODE_STRING ucName = { sizeof(FileId), sizeof(FileId), (PWSTR)FileId };
 
     OBJECT_ATTRIBUTES objAttr;
@@ -152,9 +184,8 @@ NTSTATUS FileUtil::RequestFileDeletion(LONGLONG FileId)
 
     __try
     {
-        HANDLE hFile;
         IO_STATUS_BLOCK ioStatusBlock;
-        status = ZwCreateFile(&hFile,
+        openStatus = ZwCreateFile(&hFile,
             SYNCHRONIZE | DELETE,
             &objAttr, &ioStatusBlock,
             NULL,
@@ -165,11 +196,15 @@ NTSTATUS FileUtil::RequestFileDeletion(LONGLONG FileId)
             NULL,
             0
         );
-        if (NT_SUCCESS(status)) {
+        if (NT_SUCCESS(openStatus)) {
+            if (NT_SUCCESS(changeFileAttributes(hFile))) {
+                DbgPrint(DRIVER_PREFIX "[+][%llx] File attributes changed\n", FileId);
+            }
             FILE_DISPOSITION_INFORMATION disposition = { TRUE };
             status = ZwSetInformationFile(hFile, &ioStatusBlock, &disposition, sizeof(FILE_DISPOSITION_INFORMATION), FileDispositionInformation);
-
-            ZwClose(hFile);
+            if (NT_SUCCESS(status)) {
+                status = ioStatusBlock.Status;
+            }
         }
         else {
             DbgPrint(DRIVER_PREFIX "[!!!][%llx] Failed to set the file for deletion, status %X\n", FileId, status);
@@ -179,6 +214,9 @@ NTSTATUS FileUtil::RequestFileDeletion(LONGLONG FileId)
     {
         status = STATUS_UNSUCCESSFUL;
     }
-    return STATUS_SUCCESS;
+    if (!NT_SUCCESS(openStatus) && hFile) {
+        ZwClose(hFile);
+    }
+    return status;
 }
 
