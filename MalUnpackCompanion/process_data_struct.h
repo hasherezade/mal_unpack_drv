@@ -401,6 +401,25 @@ public:
 		return 0;
 	}
 
+	bool IsAliveRoot(ULONG pid)
+	{
+		if (0 == pid) return 0;
+
+		AutoLock<FastMutex> lock(Mutex);
+
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n.rootPid == pid) {
+				if (n._isDeadNode()) {
+					return false;
+				}
+				return true;
+			}
+		}
+		return false;
+	}
+
 	bool AreSameFamily(ULONG pid1, ULONG pid2)
 	{
 		if (pid1 == 0 || pid2 == 0) {
@@ -436,18 +455,18 @@ public:
 	{
 		if (0 == pid) return STATUS_SUCCESS;
 
-		ULONG ownerPID = 0;
 		LONGLONG waitTime = (checkInterval) ? checkInterval->QuadPart : 0;
 		bool isMine = false;
-		while ((ownerPID = GetProcessOwner(pid)) != 0) {
+		// if the given PID is a root, don't let it terminate without permission
+		while (IsAliveRoot(pid)) {
 			isMine = true;
 
-			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": process requested terminate, waitTime: %zx (owner: %d, remaining children: %d)\n", pid, waitTime, ownerPID, CountProcesses(ownerPID));
+			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": process requested terminate, waitTime: %zx (owner: %d, remaining children: %d)\n", pid, waitTime, pid, CountProcesses(pid));
 			deletionEvent.ResetEvent();
 			deletionEvent.WaitForEventSet(checkInterval);
 		}
 		if (isMine) {
-			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": process termination permitted!\n", pid, waitTime, ownerPID);
+			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": process termination permitted!\n", pid, waitTime, pid);
 		}
 		return STATUS_SUCCESS;
 	}
