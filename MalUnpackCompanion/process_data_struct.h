@@ -163,25 +163,10 @@ public:
 		AutoLock<FastMutex> lock(Mutex);
 
 		t_add_status status = _addToExistingTree(pid, parentPid);
-		if (status != ADD_NO_PARENT) {
-			return status; // adding failed
+		if (status == ADD_NO_PARENT) {
+			return _createNewProcessNode(pid, respawnProtect);
 		}
-
-		//create a new node for the process:
-		ProcessNode* newItem = _getNewItemPtr();
-		if (!newItem) {
-			DbgPrint(DRIVER_PREFIX __FUNCTION__ "Could not get a new node, failed to add pid: %d!\n", pid);
-			return ADD_LIMIT_EXHAUSTED;
-		}
-		DbgPrint(DRIVER_PREFIX "Adding new root node: %d!\n", pid);
-		newItem->_init(pid, respawnProtect);
-		if (newItem->_addProcess(pid) == ADD_OK) {
-			return ADD_OK;
-		}
-		DbgPrint(DRIVER_PREFIX "Failed to add the node: %d!\n", pid);
-		newItem->_destroy();
-		ItemCount--;
-		return ADD_LIMIT_EXHAUSTED;
+		return status;
 	}
 
 	bool CanAddFile(ULONG parentPid)
@@ -495,6 +480,29 @@ private:
 	int MaxItemCount;
 	FastMutex Mutex;
 	Event deletionEvent;
+
+	t_add_status _createNewProcessNode(ULONG pid, t_noresp respawnProtect)
+	{
+		//create a new node for the process:
+		ProcessNode* newItem = _getNewItemPtr();
+		if (!newItem) {
+			DbgPrint(DRIVER_PREFIX __FUNCTION__ "Could not get a new node, failed to add pid: %d!\n", pid);
+			return ADD_LIMIT_EXHAUSTED;
+		}
+		DbgPrint(DRIVER_PREFIX "Adding new root node: %d!\n", pid);
+		newItem->_init(pid, respawnProtect);
+
+		//add root process to the list:
+		const t_add_status status = newItem->_addProcess(pid);
+		if (status == ADD_OK) {
+			return ADD_OK;
+		}
+
+		DbgPrint(DRIVER_PREFIX "Failed to add the node: %d!\n", pid);
+		newItem->_destroy();
+		ItemCount--;
+		return ADD_LIMIT_EXHAUSTED;
+	}
 
 	t_add_status _addToExistingTree(ULONG pid, ULONG parentPid)
 	{
