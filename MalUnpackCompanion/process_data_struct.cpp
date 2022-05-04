@@ -17,13 +17,23 @@ bool ProcessNode::_isEmptyNode()
 	if (!_isDeadNode() || _countProcesses() > 0) {
 		return false;
 	}
-	if (respawnProtect == t_noresp::NORESP_ALL_FILES) {
-		if (_countFiles() > 0) return false;
+	// all processes terminated, don't check for files:
+	if (respawnProtect == t_noresp::NORESP_NO_RESTRICTION) {
+		return true;
 	}
+	const int filesCount = _countFiles();
+	if (filesCount == 0) {
+		return true;
+	}
+	// allow for the initial file to still exist:
 	if (respawnProtect == t_noresp::NORESP_DROPPED_FILES) {
-		if (_countFiles() > 1) return false;
+		if (filesCount == 1) {
+			if (imgFile != FILE_INVALID_FILE_ID && _containsFile(imgFile)) {
+				return true;
+			}
+		}
 	}
-	return true;
+	return false;
 }
 
 bool ProcessNode::_containsProcess(ULONG pid)

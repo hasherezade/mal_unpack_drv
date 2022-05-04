@@ -12,15 +12,17 @@ struct ProcessNode
 
 protected:
 	ULONG rootPid;
+	ULONGLONG imgFile;
 	ItemsList<ULONG> *processList;
 	ItemsList<LONGLONG> *filesList;
 	t_noresp respawnProtect;
 
-	void _init(ULONG _pid, t_noresp _respawnProtect)
+	void _init(ULONG _pid, t_noresp _respawnProtect, ULONGLONG _imgFile)
 	{
 		processList = NULL;
 		filesList = NULL;
 		rootPid = _pid;
+		imgFile = _imgFile;
 		respawnProtect = _respawnProtect;
 	}
 
@@ -153,7 +155,7 @@ public:
 		return false;
 	}
 
-	t_add_status AddProcess(ULONG pid, ULONG parentPid, t_noresp respawnProtect)
+	t_add_status AddProcess(ULONG pid, ULONG parentPid, LONGLONG imgFile, t_noresp respawnProtect)
 	{
 		if (0 == pid) {
 			return ADD_INVALID_ITEM;
@@ -163,10 +165,10 @@ public:
 		AutoLock<FastMutex> lock(Mutex);
 
 		t_add_status status = _addToExistingTree(pid, parentPid);
-		if (status == ADD_NO_PARENT) {
-			return _createNewProcessNode(pid, respawnProtect);
+		if (status != ADD_NO_PARENT) {
+			return status; // adding failed
 		}
-		return status;
+		return _createNewProcessNode(pid, imgFile, respawnProtect);
 	}
 
 	bool CanAddFile(ULONG parentPid)
@@ -174,14 +176,10 @@ public:
 		if (0 == parentPid) {
 			return false;
 		}
-		AutoLock<FastMutex> lock(Mutex);
 
-		for (int i = 0; i < ItemCount; i++)
-		{
-			ProcessNode& n = Items[i];
-			if (n._containsProcess(parentPid)) {
-				return n._canAddFile();
-			}
+		AutoLock<FastMutex> lock(Mutex);
+		if (_CanAddFile(parentPid) == ADD_OK) {
+			return true;
 		}
 		return false;
 	}
@@ -201,50 +199,29 @@ public:
 		return true;
 	}
 
-	bool DeletePreviousFileAssociation(LONGLONG fileId, ULONG parentPid)
-	{
-		if (0 == parentPid || FILE_INVALID_FILE_ID == fileId) {
-			return true;
-		}
-		AutoLock<FastMutex> lock(Mutex);
-		for (int i = 0; i < ItemCount; i++)
-		{
-			ProcessNode& n = Items[i];
-			// this file belongs to a dead node, delete the association first:
-			if (n._containsFile(fileId)) {
-				if (n._isDeadNode() && n._countProcesses() == 0) {
-					n._deleteFile(fileId);
-					_DestroyNodeIfEmpty(i);
-				}
-				return true;
-			}
-		}
-		return false;
-	}
-
 	t_add_status AddFile(LONGLONG fileId, ULONG parentPid)
 	{
 		if (0 == parentPid || FILE_INVALID_FILE_ID == fileId) {
 			return ADD_INVALID_ITEM;
 		}
-		if (!ContainsProcess(parentPid)) {
+
+		AutoLock<FastMutex> lock(Mutex);
+
+		t_add_status canAddStatus = _CanAddFile(parentPid);
+		if (canAddStatus == ADD_NO_PARENT) {
 			return ADD_INVALID_ITEM;
 		}
-		// this file belongs to a dead node, delete the association first:
-		DeletePreviousFileAssociation(fileId, parentPid);
+
+		if (canAddStatus != ADD_OK) {
+			return canAddStatus;
+		}
+		// if this file belongs to a dead node, delete the association first:
+		if (_deletePreviousFileAssociation(fileId, parentPid) == DELETE_FORBIDDEN) {
+			return ADD_FORBIDDEN;
+		}
 
 		// add the file to the process:
-		{
-			AutoLock<FastMutex> lock(Mutex);
-			for (int i = 0; i < ItemCount; i++)
-			{
-				ProcessNode& n = Items[i];
-				if (n._containsProcess(parentPid)) {
-					return n._addFile(fileId);
-				}
-			}
-		}
-		return ADD_INVALID_ITEM;
+		return _addFile(fileId, parentPid);
 	}
 
 	t_add_status AddProcessToFileOwner(ULONG PID, LONGLONG fileId)
@@ -442,15 +419,7 @@ public:
 		if (0 == pid1) return false;
 
 		AutoLock<FastMutex> lock(Mutex);
-
-		for (int i = 0; i < ItemCount; i++)
-		{
-			ProcessNode& n = Items[i];
-			if (n._containsProcess(pid1)) {
-				return true;
-			}
-		}
-		return false;
+		return _ContainsProcess(pid1);
 	}
 
 	NTSTATUS WaitForProcessDeletion(ULONG pid, PLARGE_INTEGER checkInterval)
@@ -481,7 +450,87 @@ private:
 	FastMutex Mutex;
 	Event deletionEvent;
 
-	t_add_status _createNewProcessNode(ULONG pid, t_noresp respawnProtect)
+
+	bool _ContainsProcess(ULONG pid1)
+	{
+		if (0 == pid1) return false;
+
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n._containsProcess(pid1)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	t_add_status _CanAddFile(ULONG parentPid)
+	{
+		if (0 == parentPid) {
+			return ADD_INVALID_ITEM;
+		}
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n._containsProcess(parentPid)) {
+				if (n._canAddFile()) {
+					return ADD_OK;
+				}
+				return ADD_LIMIT_EXHAUSTED;
+			}
+		}
+		return ADD_NO_PARENT;
+	}
+
+	t_add_status _addFile(LONGLONG fileId, ULONG parentPid)
+	{
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n._containsProcess(parentPid)) {
+				return n._addFile(fileId);
+			}
+		}
+		return ADD_INVALID_ITEM;
+	}
+
+	typedef enum {
+		DELETE_OK = 0,
+		DELETE_NOT_FOUND,
+		DELETE_INVALID_ITEM,
+		DELETE_FORBIDDEN,
+		DELETE_STATES_COUNT
+	} t_delete_status;
+
+	t_delete_status _deletePreviousFileAssociation(LONGLONG fileId, ULONG excludedPid)
+	{
+		if (FILE_INVALID_FILE_ID == fileId) {
+			return DELETE_INVALID_ITEM;
+		}
+
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			// this file belongs to a dead node, delete the association first:
+			if (n._containsFile(fileId)) {
+				if (n._isDeadNode() && n._countProcesses() == 0) {
+					n._deleteFile(fileId);
+					_DestroyNodeIfEmpty(i);
+					return DELETE_OK;
+				}
+				if (excludedPid && n._containsProcess(excludedPid)) {
+					break; // file found in the excluded process, so deleting is not required
+				}
+				//this process tree is not dead
+				return DELETE_FORBIDDEN;
+			}
+		}
+		return DELETE_NOT_FOUND;
+	}
+
+
+	t_add_status _createNewProcessNode(ULONG pid, LONGLONG imgFile, t_noresp respawnProtect)
 	{
 		//create a new node for the process:
 		ProcessNode* newItem = _getNewItemPtr();
@@ -490,7 +539,7 @@ private:
 			return ADD_LIMIT_EXHAUSTED;
 		}
 		DbgPrint(DRIVER_PREFIX "Adding new root node: %d!\n", pid);
-		newItem->_init(pid, respawnProtect);
+		newItem->_init(pid, respawnProtect, imgFile);
 
 		//add root process to the list:
 		const t_add_status status = newItem->_addProcess(pid);
