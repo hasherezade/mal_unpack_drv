@@ -222,6 +222,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 	if (params.Options & FILE_DIRECTORY_FILE) {
 		return FLT_PREOP_SUCCESS_NO_CALLBACK; // do not interfere
 	}
+
 	// check if the process is watched:
 	const ULONG sourcePID = HandleToULong(PsGetCurrentProcessId()); //the PID of the process performing the operation
 	if (!Data::ContainsProcess(sourcePID)) {
@@ -238,7 +239,10 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 		}
 		return FLT_PREOP_SYNCHRONIZE; // sync with post-op
 	}
-
+	bool is_delete = false;
+	if (params.Options & FILE_DELETE_ON_CLOSE) {
+		is_delete = true;
+	}
 	const ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
 	const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
 	const ULONG all_write = FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
@@ -248,7 +252,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 	NTSTATUS fileIdStatus = FltUtil::GetFileId(FltObjects, Data, fileId, __FUNCTION__);
 	//It is NOT a creation of new file, and cannot verify the file ID, so deny the access...
 	if (FILE_INVALID_FILE_ID == fileId) {
-		if ((FILE_OPEN != createDisposition) || (DesiredAccess & all_write)) {
+		if ((FILE_OPEN != createDisposition) || (DesiredAccess & all_write) || is_delete) {
 
 			if (fileIdStatus == STATUS_OBJECT_NAME_NOT_FOUND) {
 				Data->IoStatus.Status = fileIdStatus;
@@ -264,7 +268,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
 
-	if (DesiredAccess & all_write) {
+	if ((DesiredAccess & all_write) || is_delete) {
 		if (!Data::IsProcessInFileOwners(sourcePID, fileId)) {
 			// this file does not belong to the current process, block the access:
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
