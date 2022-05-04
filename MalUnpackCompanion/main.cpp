@@ -380,6 +380,25 @@ NTSTATUS TerminateWatched(PIRP Irp)
 	return _TerminateWatched(inpData->Pid);
 }
 
+NTSTATUS _DeleteWatchedFile(ULONG PID, LONGLONG fileId)
+{
+	if (Data::GetFileOwner(PID) != PID) {
+		return STATUS_ACCESS_DENIED;
+	}
+	return FileUtil::RequestFileDeletion(fileId);
+}
+
+NTSTATUS DeleteWatchedFile(PIRP Irp)
+{
+	ProcessDataEx_v1* inpData = nullptr;
+
+	NTSTATUS status = FetchInputBuffer(Irp, &inpData);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	return _DeleteWatchedFile(inpData->Pid, inpData->fileId);
+}
+
 NTSTATUS _CopyWatchedList(PIRP Irp, ULONG_PTR& outLen, bool files)
 {
 	ProcessDataBasic* inpData = nullptr;
@@ -494,6 +513,11 @@ NTSTATUS HandleDeviceControl(PDEVICE_OBJECT, PIRP Irp)
 		case IOCTL_MUNPACK_COMPANION_TERMINATE_WATCHED:
 		{
 			status = TerminateWatched(Irp);
+			break;
+		}
+		case IOCTL_MUNPACK_COMPANION_DELETE_WATCHED_FILE:
+		{
+			status = DeleteWatchedFile(Irp);
 			break;
 		}
 		case IOCTL_MUNPACK_COMPANION_LIST_PROCESSES:
