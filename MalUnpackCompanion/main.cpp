@@ -384,6 +384,7 @@ NTSTATUS _DeleteWatchedFile(ULONG PID, PUNICODE_STRING FileName)
 {
 	LONGLONG fileId = FileUtil::GetFileIdByPath(FileName);
 	const ULONG fileOwnerPid = Data::GetFileOwner(fileId);
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ "< FileID = %llx, PID = %d, fileOwnerPid = %d\n", fileId, PID, fileOwnerPid);
 	if (fileOwnerPid != PID) {
 		return STATUS_ACCESS_DENIED;
 	}
@@ -400,11 +401,15 @@ NTSTATUS DeleteWatchedFile(PIRP Irp)
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
-	UNICODE_STRING FileName = { 0 };
-	RtlInitUnicodeString(&FileName, inpData->FileName);
-	status = _DeleteWatchedFile(inpData->Pid, &FileName);
-	RtlFreeUnicodeString(&FileName);
-	return status;
+	// ensure it is NULL-terminated:
+	inpData->FileName[MAX_PATH_LEN - 1] = L'\0';
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ "Passed buffer: %S\n", inpData->FileName);
+
+	UNICODE_STRING name;
+	RtlInitUnicodeString(&name, inpData->FileName);
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ "Passed buffer to unicode: %wZ\n", name);
+
+	return _DeleteWatchedFile(inpData->Pid, &name);
 }
 
 NTSTATUS _CopyWatchedList(PIRP Irp, ULONG_PTR& outLen, bool files)

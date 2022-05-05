@@ -144,7 +144,6 @@ NTSTATUS FileUtil::RequestFileDeletion(PUNICODE_STRING FileName)
     if (KeGetCurrentIrql() != PASSIVE_LEVEL) {
         return STATUS_UNSUCCESSFUL;
     }
-
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     OBJECT_ATTRIBUTES objAttr;
     InitializeObjectAttributes(&objAttr, FileName, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
@@ -157,9 +156,8 @@ NTSTATUS FileUtil::RequestFileDeletion(PUNICODE_STRING FileName)
             &objAttr, &ioStatusBlock,
             NULL,
             FILE_ATTRIBUTE_NORMAL,
-            FILE_SHARE_DELETE,
-            FILE_OPEN,
-            FILE_SYNCHRONOUS_IO_NONALERT | FILE_DELETE_ON_CLOSE | FILE_OPEN_BY_FILE_ID,
+            FILE_SHARE_DELETE, FILE_OPEN,
+            FILE_SYNCHRONOUS_IO_NONALERT | FILE_DELETE_ON_CLOSE,
             NULL,
             0
         );
@@ -176,7 +174,6 @@ NTSTATUS FileUtil::RequestFileDeletion(PUNICODE_STRING FileName)
     {
         status = GetExceptionCode();
     }
-    RtlFreeUnicodeString(FileName);
-    return STATUS_SUCCESS;
+    return status;
 }
 
