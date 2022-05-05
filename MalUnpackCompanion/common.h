@@ -34,7 +34,7 @@ struct ProcessDataEx_v2 {
 
 struct ProcessFileData {
 	ULONG Pid;
-	WCHAR FileName[MAX_PATH_LEN];
+	WCHAR FileName[1]; //dynamic length
 };
 
 typedef ProcessDataEx_v2 ProcessDataEx;

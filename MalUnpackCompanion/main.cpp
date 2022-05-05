@@ -229,7 +229,7 @@ NTSTATUS HandleCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	return openStatus;
 }
 
-NTSTATUS FetchInputBufferOfMinSize(PIRP Irp, void** inpData, const size_t inpDataSize)
+NTSTATUS FetchInputBufferOfMinSize(IN PIRP Irp, OUT void** inpData, IN const size_t inpDataSize, OUT OPTIONAL size_t *actualSize = nullptr)
 {
 	if (!Irp || inpData == nullptr) {
 		return STATUS_UNSUCCESSFUL;
@@ -237,14 +237,18 @@ NTSTATUS FetchInputBufferOfMinSize(PIRP Irp, void** inpData, const size_t inpDat
 	PIO_STACK_LOCATION stack = IoGetCurrentIrpStackLocation(Irp);
 	ULONG method = IO_METHOD_FROM_CTL_CODE(stack->Parameters.DeviceIoControl.IoControlCode);
 
+	size_t InputBufferLength = 0;
+
 	if (method == METHOD_BUFFERED) {
-		if (stack->Parameters.DeviceIoControl.InputBufferLength < inpDataSize) {
+		InputBufferLength = stack->Parameters.DeviceIoControl.InputBufferLength;
+		if (InputBufferLength < inpDataSize) {
 			return STATUS_BUFFER_TOO_SMALL;
 		}
 		*inpData = Irp->AssociatedIrp.SystemBuffer;
 	}
 	else if (method == METHOD_NEITHER) {
-		if (stack->Parameters.DeviceIoControl.InputBufferLength < inpDataSize) {
+		InputBufferLength = stack->Parameters.DeviceIoControl.InputBufferLength;
+		if (InputBufferLength < inpDataSize) {
 			return STATUS_BUFFER_TOO_SMALL;
 		}
 		*inpData = stack->Parameters.DeviceIoControl.Type3InputBuffer;
@@ -254,6 +258,9 @@ NTSTATUS FetchInputBufferOfMinSize(PIRP Irp, void** inpData, const size_t inpDat
 	}
 	if (*inpData == nullptr) {
 		return STATUS_INVALID_PARAMETER;
+	}
+	if (actualSize) {
+		*actualSize = InputBufferLength;
 	}
 	return STATUS_SUCCESS;
 }
@@ -416,14 +423,18 @@ NTSTATUS _DeleteWatchedFile(ULONG PID, PUNICODE_STRING FileName)
 NTSTATUS DeleteWatchedFile(PIRP Irp)
 {
 	ProcessFileData* inpData = nullptr;
-
-	NTSTATUS status = FetchInputBuffer(Irp, &inpData);
+	const size_t minimalLen = 4; // minimal length we expect valid path to be
+	const size_t minimalSize = sizeof(ProcessFileData) + (sizeof(WCHAR) * minimalLen);
+	size_t actualSize = 0;
+	NTSTATUS status = FetchInputBufferOfMinSize(Irp, (void**)&inpData, minimalSize, &actualSize);
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
+	NT_ASSERT(actualSize > sizeof(ProcessFileData));
+	const size_t actualLen = (actualSize - sizeof(ProcessFileData)) / sizeof(WCHAR);
 	// ensure it is NULL-terminated:
-	inpData->FileName[MAX_PATH_LEN - 1] = L'\0';
-	DbgPrint(DRIVER_PREFIX __FUNCTION__ "Passed buffer: %S\n", inpData->FileName);
+	inpData->FileName[actualLen] = L'\0';
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ "Passed buffer: %S len: %lld size: %lld\n", inpData->FileName, actualLen, actualSize);
 
 	UNICODE_STRING name;
 	RtlInitUnicodeString(&name, inpData->FileName);
