@@ -164,7 +164,7 @@ namespace FltUtil {
 }
 
 
-bool _SetFileContext(PCFLT_RELATED_OBJECTS FltObjects, ULONG sourcePID, LONGLONG fileId, char* caller)
+bool _SetFileContext(PCFLT_RELATED_OBJECTS FltObjects, LONGLONG fileId, char* caller)
 {
 	FileContext* ctx = nullptr; //STATUS_FLT_CONTEXT_ALLOCATION_NOT_FOUND
 	NTSTATUS ctx_status = FltAllocateContext(FltObjects->Filter, FLT_FILE_CONTEXT, sizeof(FileContext), PagedPool, (PFLT_CONTEXT*)&ctx);
@@ -174,7 +174,6 @@ bool _SetFileContext(PCFLT_RELATED_OBJECTS FltObjects, ULONG sourcePID, LONGLONG
 	}
 	bool isSet = false;
 	ctx->fileId = fileId;
-	ctx->sourcePID = sourcePID;
 	ctx_status = FltSetFileContext(FltObjects->Instance, FltObjects->FileObject, FLT_SET_CONTEXT_KEEP_IF_EXISTS, ctx, nullptr);
 	if (NT_SUCCESS(ctx_status)) {
 		KdPrint((DRIVER_PREFIX "[CTX][OK][%s][%llX] Attached the context to the file\n", caller, fileId));
@@ -331,7 +330,7 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		// assign this file to the process that created it:
 		const t_add_status add_status =  Data::AddFile(fileId, sourcePID);
 		if (add_status == ADD_OK) {
-			_SetFileContext(FltObjects, sourcePID, fileId, __FUNCTION__);
+			_SetFileContext(FltObjects, fileId, __FUNCTION__);
 		}
 		if (add_status == ADD_LIMIT_EXHAUSTED) {
 			DbgPrint(DRIVER_PREFIX "[%llX][%s] Could not add to the files watchlist: limit exhausted\n", fileId, __FUNCTION__);
@@ -416,7 +415,7 @@ FLT_PREOP_CALLBACK_STATUS MyPreCleanup(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OB
 	if (NT_SUCCESS(fileIdStatus)) {
 		fileOwner = Data::GetFileOwner(fileId);
 		if (fileOwner && fileId != FILE_INVALID_FILE_ID) {
-			_SetFileContext(FltObjects, fileOwner, fileId, __FUNCTION__);
+			_SetFileContext(FltObjects, fileId, __FUNCTION__);
 		}
 	}
 	return FLT_PREOP_SUCCESS_WITH_CALLBACK;

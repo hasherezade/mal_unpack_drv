@@ -11,7 +11,6 @@ extern active_settings g_Settings;
 
 struct FileContext
 {
-	ULONG sourcePID;
 	LONGLONG fileId;
 };
 
