@@ -164,6 +164,9 @@ NTSTATUS FileUtil::RequestFileDeletion(PUNICODE_STRING FileName)
         if (NT_SUCCESS(status)) {
             FILE_DISPOSITION_INFORMATION disposition = { TRUE };
             status = ZwSetInformationFile(hFile, &ioStatusBlock, &disposition, sizeof(FILE_DISPOSITION_INFORMATION), FileDispositionInformation);
+            if (NT_SUCCESS(status)) {
+                status = ioStatusBlock.Status;
+            }
         }
         else {
             DbgPrint(DRIVER_PREFIX "[!!!] Failed to set the file for deletion, status %X\n", status);
