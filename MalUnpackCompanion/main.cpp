@@ -229,10 +229,8 @@ NTSTATUS HandleCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	return openStatus;
 }
 
-template<typename DATA_BUF>
-NTSTATUS FetchInputBuffer(PIRP Irp, DATA_BUF** inpData)
+NTSTATUS FetchInputBufferOfMinSize(PIRP Irp, void** inpData, const size_t inpDataSize)
 {
-	const size_t inpDataSize = sizeof(DATA_BUF);
 	if (!Irp || inpData == nullptr) {
 		return STATUS_UNSUCCESSFUL;
 	}
@@ -243,13 +241,13 @@ NTSTATUS FetchInputBuffer(PIRP Irp, DATA_BUF** inpData)
 		if (stack->Parameters.DeviceIoControl.InputBufferLength < inpDataSize) {
 			return STATUS_BUFFER_TOO_SMALL;
 		}
-		*inpData = (DATA_BUF*)Irp->AssociatedIrp.SystemBuffer;
+		*inpData = Irp->AssociatedIrp.SystemBuffer;
 	}
 	else if (method == METHOD_NEITHER) {
 		if (stack->Parameters.DeviceIoControl.InputBufferLength < inpDataSize) {
 			return STATUS_BUFFER_TOO_SMALL;
 		}
-		*inpData = (DATA_BUF*)stack->Parameters.DeviceIoControl.Type3InputBuffer;
+		*inpData = stack->Parameters.DeviceIoControl.Type3InputBuffer;
 	}
 	else {
 		return STATUS_NOT_SUPPORTED;
@@ -257,7 +255,17 @@ NTSTATUS FetchInputBuffer(PIRP Irp, DATA_BUF** inpData)
 	if (*inpData == nullptr) {
 		return STATUS_INVALID_PARAMETER;
 	}
-	return STATUS_SUCCESS; 
+	return STATUS_SUCCESS;
+}
+
+template<typename DATA_BUF>
+NTSTATUS FetchInputBuffer(PIRP Irp, DATA_BUF** inpData)
+{
+	if (!Irp || inpData == nullptr) {
+		return STATUS_UNSUCCESSFUL;
+	}
+	const size_t inpDataSize = sizeof(DATA_BUF);
+	return FetchInputBufferOfMinSize(Irp, (void**)inpData, inpDataSize);
 }
 
 //---
