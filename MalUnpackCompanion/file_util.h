@@ -1,9 +1,10 @@
 #pragma once
 
 #include "undoc_api.h"
-#include "common.h"
 
 namespace FileUtil {
+
+    const USHORT MAX_PATH_LEN = 1024;
 
     bool RetrieveImagePath(PIMAGE_INFO ImageInfo, WCHAR FileName[MAX_PATH_LEN]);
 

@@ -7,7 +7,7 @@
 #define MY_DEVICE L"\\Device\\MalUnpackCompanion"
 #define MY_DRIVER_LINK L"\\??\\MalUnpackCompanion"
 
-const USHORT MAX_PATH_LEN = 1024;
+#define RENAMED_EXTENSION L".unsafe"
 
 typedef enum {
 	NORESP_NO_RESTRICTION = 0,

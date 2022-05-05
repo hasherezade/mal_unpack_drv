@@ -3,7 +3,7 @@
 
 #include <fltKernel.h>
 
-bool FileUtil::RetrieveImagePath(PIMAGE_INFO ImageInfo, WCHAR FileName[MAX_PATH_LEN])
+bool FileUtil::RetrieveImagePath(PIMAGE_INFO ImageInfo, WCHAR FileName[FileUtil::MAX_PATH_LEN])
 {
     if (KeGetCurrentIrql() != PASSIVE_LEVEL) {
         return false;

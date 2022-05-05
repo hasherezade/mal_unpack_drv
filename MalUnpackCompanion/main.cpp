@@ -21,7 +21,6 @@
 #define ALTITUDE_REGISTRY_FILTER L"7657.124"
 
 #define SUPPORTED_CLIENT_NAME L"\\mal_unpack.exe"
-#define IGNORED_EXTENSION L".unsafe"
 
 #define IO_METHOD_FROM_CTL_CODE(cltCode) (cltCode & 0x00000003)
 
@@ -110,7 +109,7 @@ void OnImageLoadNotify(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_I
 #ifdef _RETRIEVE_PATH
 	UNREFERENCED_PARAMETER(FullImageName);
 	// retrieve image path manually: backward compatibility with Windows < 10
-	WCHAR FileName[MAX_PATH_LEN] = { 0 };
+	WCHAR FileName[FileUtil::MAX_PATH_LEN] = { 0 };
 	if (!FileUtil::RetrieveImagePath(ImageInfo, FileName)) {
 		return;
 	}
@@ -410,7 +409,7 @@ NTSTATUS _DeleteWatchedFile(ULONG PID, PUNICODE_STRING FileName)
 	DbgPrint(DRIVER_PREFIX __FUNCTION__ "FileID = %llx, PID = %d, status = %X\n", fileId, PID, status);
 #ifdef _TREAT_RENAMED_AS_DELETED
 	if (status == STATUS_CANNOT_DELETE) {
-		if (Util::hasSuffix(FileName, IGNORED_EXTENSION)) {
+		if (Util::hasSuffix(FileName, RENAMED_EXTENSION)) {
 			if (Data::DeleteFile(fileId)) {
 				status = STATUS_SUCCESS;
 			}
