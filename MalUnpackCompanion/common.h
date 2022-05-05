@@ -7,14 +7,37 @@
 #define MY_DEVICE L"\\Device\\MalUnpackCompanion"
 #define MY_DRIVER_LINK L"\\??\\MalUnpackCompanion"
 
-struct ProcessData {
-	ULONG Id;
+#define RENAMED_EXTENSION L".unsafe"
+
+typedef enum {
+	NORESP_NO_RESTRICTION = 0,
+	NORESP_DROPPED_FILES = 1,
+	NORESP_ALL_FILES = 2,
+	COUNT_NORESP
+} t_noresp;
+
+
+struct ProcessDataBasic {
+	ULONG Pid;
 };
 
-struct ProcessDataEx {
-	ULONG Id;
+struct ProcessDataEx_v1 {
+	ULONG Pid;
 	LONGLONG fileId;
 };
+
+struct ProcessDataEx_v2 {
+	ULONG Pid;
+	LONGLONG fileId;
+	t_noresp noresp; //respawn protection level
+};
+
+struct ProcessFileData {
+	ULONG Pid;
+	WCHAR FileName[1]; //dynamic length
+};
+
+typedef ProcessDataEx_v2 ProcessDataEx;
 
 
 #define MUNPACK_COMPANION_DEVICE 0x8000
@@ -36,3 +59,9 @@ struct ProcessDataEx {
 
 #define IOCTL_MUNPACK_COMPANION_REMOVE_FROM_WATCHED CTL_CODE(MUNPACK_COMPANION_DEVICE, \
 	0x805, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+#define IOCTL_MUNPACK_COMPANION_COUNT_NODES CTL_CODE(MUNPACK_COMPANION_DEVICE, \
+	0x806, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+#define IOCTL_MUNPACK_COMPANION_DELETE_WATCHED_FILE CTL_CODE(MUNPACK_COMPANION_DEVICE, \
+	0x807, METHOD_BUFFERED, FILE_ANY_ACCESS)

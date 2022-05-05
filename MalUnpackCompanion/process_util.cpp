@@ -1,8 +1,10 @@
 #include "process_util.h"
 #include "data_structs.h"
 #include "common.h"
+#include "util.h"
 
 namespace ProcessUtil {
+
 
 	NTSTATUS RetrieveProcessHandle(const PEPROCESS Process, bool& isCurrentProcess, HANDLE& hProcess)
 	{
@@ -37,12 +39,7 @@ bool ProcessUtil::CheckProcessPath(const PEPROCESS Process, PWCH supportedName)
 		RtlZeroMemory(processName, size); // ensure string will be NULL-terminated
 		status = ZwQueryInformationProcess(hProcess, ProcessImageFileName, processName, size - sizeof(WCHAR), nullptr);
 		if (NT_SUCCESS(status)) {
-			const wchar_t* found = ::wcsstr(processName->Buffer, supportedName);
-			if (found != nullptr) {
-				if (::wcscmp(found, supportedName) == 0) {
-					allowAccess = true;
-				}
-			}
+			allowAccess = Util::hasSuffix(processName, supportedName);
 		}
 		ExFreePool(processName);
 	}

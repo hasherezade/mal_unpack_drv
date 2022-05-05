@@ -74,6 +74,16 @@ t_add_status Data::AddProcess(ULONG pid, ULONG parentPid)
 	return status;
 }
 
+t_add_status Data::AddProcessNode(ULONG pid, LONGLONG imgFileId, t_noresp respawnProtect)
+{
+	t_add_status status = g_ProcessNode.AddProcessNode(pid, imgFileId, respawnProtect);
+	if (status == ADD_LIMIT_EXHAUSTED) {
+		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Cannot add the process: %d, terminating...\n", pid);
+		ProcessUtil::TerminateProcess(pid);
+	}
+	return status;
+}
+
 t_add_status Data::AddProcessToFileOwner(ULONG PID, LONGLONG fileId)
 {
 	t_add_status status = g_ProcessNode.AddProcessToFileOwner(PID, fileId);
@@ -87,12 +97,18 @@ t_add_status Data::AddProcessToFileOwner(ULONG PID, LONGLONG fileId)
 int Data::CountProcessTrees()
 {
 	return g_ProcessNode.CountNodes();
-};
-
+}
 
 bool Data::DeleteProcess(ULONG pid)
 {
 	bool isOk = g_ProcessNode.DeleteProcess(pid);
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Watched nodes: %d\n", g_ProcessNode.CountNodes());
+	return isOk;
+}
+
+bool Data::DeleteFile(LONGLONG fileId)
+{
+	bool isOk = g_ProcessNode.DeleteFile(fileId);
 	DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Watched nodes: %d\n", g_ProcessNode.CountNodes());
 	return isOk;
 }

@@ -6,21 +6,24 @@
 	#define FILE_INVALID_FILE_ID               ((LONGLONG)-1LL) 
 #endif
 
-
 struct ProcessNode
 {
 	friend struct ProcessNodesList;
 
 protected:
 	ULONG rootPid;
+	LONGLONG imgFile;
 	ItemsList<ULONG> *processList;
 	ItemsList<LONGLONG> *filesList;
+	t_noresp respawnProtect;
 
-	void _init(ULONG _pid)
+	void _init(ULONG _pid, t_noresp _respawnProtect, LONGLONG _imgFile)
 	{
 		processList = NULL;
 		filesList = NULL;
 		rootPid = _pid;
+		imgFile = _imgFile;
+		respawnProtect = _respawnProtect;
 	}
 
 	bool _initItems()
@@ -70,18 +73,20 @@ protected:
 			filesList = NULL;
 		}
 		rootPid = 0;
+		imgFile = FILE_INVALID_FILE_ID;
+		respawnProtect = t_noresp::NORESP_NO_RESTRICTION;
 	}
 
 	bool _copy(const ProcessNode& node)
 	{
-		rootPid = node.rootPid;
-		processList = node.processList;
-		filesList = node.filesList;
+		::memcpy(this, &node, sizeof(ProcessNode));
 		return true;
 	}
 
-	// check it the root process terminated
+	// check if the root process terminated
 	bool _isDeadNode();
+
+	bool _isEmptyNode();
 
 	bool _containsFile(LONGLONG fileId);
 
@@ -95,7 +100,11 @@ protected:
 
 	int _countProcesses();
 
+	int _countFiles();
+
 	bool _deleteProcess(ULONG pid);
+
+	bool _deleteFile(LONGLONG);
 
 	size_t _copyProcessList(void* data, size_t outBufSize);
 
@@ -151,42 +160,23 @@ public:
 		if (0 == pid) {
 			return ADD_INVALID_ITEM;
 		}
-		//Allow for the parentPid == 0: it means a new root node
-		
+		if (0 == parentPid) {
+			return ADD_NO_PARENT;
+		}
 		AutoLock<FastMutex> lock(Mutex);
-		if (parentPid != 0) {
-			for (int i = 0; i < ItemCount; i++)
-			{
-				ProcessNode& n = Items[i];
-				if (n.rootPid == parentPid) {
-					return n._addProcess(pid);
-				}
-			}
+		return _addToExistingTree(pid, parentPid);
+	}
 
-			for (int i = 0; i < ItemCount; i++)
-			{
-				ProcessNode& n = Items[i];
-				if (n._containsProcess(parentPid)) {
-					return n._addProcess(pid);
-				}
-			}
+	t_add_status AddProcessNode(ULONG pid, LONGLONG imgFile, t_noresp respawnProtect)
+	{
+		if (0 == pid) {
+			return ADD_INVALID_ITEM;
 		}
-
-		//create a new node for the process:
-		ProcessNode* newItem = _getNewItemPtr();
-		if (!newItem) {
-			DbgPrint(DRIVER_PREFIX __FUNCTION__ "Could not get a new node, failed to add pid: %d!\n", pid);
-			return ADD_LIMIT_EXHAUSTED;
+		AutoLock<FastMutex> lock(Mutex);
+		if (_ContainsProcess(pid)) {
+			return ADD_FORBIDDEN;
 		}
-		DbgPrint(DRIVER_PREFIX "Adding new root node: %d!\n", pid);
-		newItem->_init(pid);
-		if (newItem->_addProcess(pid) == ADD_OK) {
-			return ADD_OK;
-		}
-		DbgPrint(DRIVER_PREFIX "Failed to add the node: %d!\n", pid);
-		newItem->_destroy();
-		ItemCount--;
-		return ADD_LIMIT_EXHAUSTED;
+		return _createNewProcessNode(pid, imgFile, respawnProtect);
 	}
 
 	bool CanAddFile(ULONG parentPid)
@@ -194,16 +184,27 @@ public:
 		if (0 == parentPid) {
 			return false;
 		}
-		AutoLock<FastMutex> lock(Mutex);
 
-		for (int i = 0; i < ItemCount; i++)
-		{
-			ProcessNode& n = Items[i];
-			if (n._containsProcess(parentPid)) {
-				return n._canAddFile();
-			}
+		AutoLock<FastMutex> lock(Mutex);
+		if (_CanAddFile(parentPid) == ADD_OK) {
+			return true;
 		}
 		return false;
+	}
+
+	inline bool _DestroyNodeIfEmpty(int i)
+	{
+		ProcessNode& n = Items[i];
+		if (!n._isEmptyNode()) {
+			return false;
+		}
+		n._destroy();
+		//rewrite the last element on the place of the current:
+		if (ItemCount > 1) {
+			Items[i]._copy(Items[ItemCount - 1]);
+		}
+		ItemCount--;
+		return true;
 	}
 
 	t_add_status AddFile(LONGLONG fileId, ULONG parentPid)
@@ -214,14 +215,22 @@ public:
 
 		AutoLock<FastMutex> lock(Mutex);
 
-		for (int i = 0; i < ItemCount; i++)
-		{
-			ProcessNode& n = Items[i];
-			if (n._containsProcess(parentPid)) {
-				return n._addFile(fileId);
-			}
+		t_add_status canAddStatus = _CanAddFile(parentPid);
+		if (canAddStatus == ADD_NO_PARENT) {
+			return ADD_INVALID_ITEM;
 		}
-		return ADD_INVALID_ITEM;
+
+		if (canAddStatus != ADD_OK) {
+			return canAddStatus;
+		}
+		// if this file belongs to a dead node, delete the association first:
+		const t_delete_status delStatus = _deletePreviousFileAssociation(fileId, parentPid);
+		if (delStatus == DELETE_FORBIDDEN) {
+			return ADD_FORBIDDEN;
+		}
+
+		// add the file to the process:
+		return _addFile(fileId, parentPid);
 	}
 
 	t_add_status AddProcessToFileOwner(ULONG PID, LONGLONG fileId)
@@ -266,7 +275,7 @@ public:
 
 	bool DeleteProcess(ULONG pid)
 	{
-		if (0 == pid) return 0;
+		if (0 == pid) return false;
 
 		AutoLock<FastMutex> lock(Mutex);
 
@@ -275,15 +284,30 @@ public:
 			ProcessNode& n = Items[i];
 			if (n._containsProcess(pid)) {
 				if (n._deleteProcess(pid)) {
-					if (n._countProcesses() == 0) {
-						n._destroy();
-						//rewrite the last element on the place of the current:
-						if (ItemCount > 1) {
-							Items[i]._copy(Items[ItemCount - 1]);
-						}
-						ItemCount--;
+					if (n._isDeadNode()) {
 						deletionEvent.SetEvent();
 					}
+					_DestroyNodeIfEmpty(i);
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	bool DeleteFile(LONGLONG fileId)
+	{
+		if (FILE_INVALID_FILE_ID == fileId) return false;
+
+		AutoLock<FastMutex> lock(Mutex);
+
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n._containsFile(fileId)) {
+				if (n._deleteFile(fileId)) {
+					_DestroyNodeIfEmpty(i);
+					return true;
 				}
 			}
 		}
@@ -404,33 +428,34 @@ public:
 		if (0 == pid1) return false;
 
 		AutoLock<FastMutex> lock(Mutex);
-
-		for (int i = 0; i < ItemCount; i++)
-		{
-			ProcessNode& n = Items[i];
-			if (n._containsProcess(pid1)) {
-				return true;
-			}
-		}
-		return false;
+		return _ContainsProcess(pid1);
 	}
 
 	NTSTATUS WaitForProcessDeletion(ULONG pid, PLARGE_INTEGER checkInterval)
 	{
-		if (0 == pid) return STATUS_SUCCESS;
+		if (0 == pid) return STATUS_INVALID_PARAMETER;
+
+		LONGLONG waitTime = (checkInterval) ? checkInterval->QuadPart : 0;
+		bool isRoot = false;
 
 		ULONG ownerPID = 0;
-		LONGLONG waitTime = (checkInterval) ? checkInterval->QuadPart : 0;
-		bool isMine = false;
-		while ((ownerPID = GetProcessOwner(pid)) != 0) {
-			isMine = true;
+		while ((ownerPID = GetProcessOwner(pid)) == pid) {
+			// if the given PID is a root, don't let it terminate without permission
+			isRoot = true;
 
-			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": process requested terminate, waitTime: %zx (owner: %d, remaining children: %d)\n", pid, waitTime, ownerPID, CountProcesses(ownerPID));
+			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": process requested terminate, waitTime: %zx (owner: %d, remaining children: %d)\n", pid, waitTime, pid, CountProcesses(pid));
 			deletionEvent.ResetEvent();
 			deletionEvent.WaitForEventSet(checkInterval);
 		}
-		if (isMine) {
-			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": process termination permitted!\n", pid, waitTime, ownerPID);
+		if (isRoot) {
+			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": root process termination permitted!\n", pid, waitTime, pid);
+		}
+
+		if (ownerPID != 0) {
+			// the process is still on the list, so delete it
+			// this may happen in case of a child process that is terminating on its own
+			DbgPrint(DRIVER_PREFIX "[%d] " __FUNCTION__ ": child process termination permitted!\n", pid, waitTime, pid);
+			DeleteProcess(pid);
 		}
 		return STATUS_SUCCESS;
 	}
@@ -442,6 +467,136 @@ private:
 	int MaxItemCount;
 	FastMutex Mutex;
 	Event deletionEvent;
+
+
+	bool _ContainsProcess(ULONG pid1)
+	{
+		if (0 == pid1) return false;
+
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n._containsProcess(pid1)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	t_add_status _CanAddFile(ULONG parentPid)
+	{
+		if (0 == parentPid) {
+			return ADD_INVALID_ITEM;
+		}
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n._containsProcess(parentPid)) {
+				if (n._canAddFile()) {
+					return ADD_OK;
+				}
+				return ADD_LIMIT_EXHAUSTED;
+			}
+		}
+		return ADD_NO_PARENT;
+	}
+
+	t_add_status _addFile(LONGLONG fileId, ULONG parentPid)
+	{
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n._containsProcess(parentPid)) {
+				return n._addFile(fileId);
+			}
+		}
+		return ADD_INVALID_ITEM;
+	}
+
+	typedef enum {
+		DELETE_OK = 0,
+		DELETE_NOT_FOUND,
+		DELETE_INVALID_ITEM,
+		DELETE_FORBIDDEN,
+		DELETE_EXCLUDED,
+		DELETE_STATES_COUNT
+	} t_delete_status;
+
+	t_delete_status _deletePreviousFileAssociation(LONGLONG fileId, ULONG excludedPid)
+	{
+		if (FILE_INVALID_FILE_ID == fileId) {
+			return DELETE_INVALID_ITEM;
+		}
+
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			// this file belongs to a dead node, delete the association first:
+			if (n._containsFile(fileId)) {
+				if (n._isDeadNode() && n._countProcesses() == 0) {
+					n._deleteFile(fileId);
+					_DestroyNodeIfEmpty(i);
+					return DELETE_OK;
+				}
+				if (excludedPid && n._containsProcess(excludedPid)) {
+					return DELETE_EXCLUDED; // file found in the excluded process, so deleting is not required
+				}
+				//this process tree is not dead
+				return DELETE_FORBIDDEN;
+			}
+		}
+		return DELETE_NOT_FOUND;
+	}
+
+
+	t_add_status _createNewProcessNode(ULONG pid, LONGLONG imgFile, t_noresp respawnProtect)
+	{
+		//create a new node for the process:
+		ProcessNode* newItem = _getNewItemPtr();
+		if (!newItem) {
+			return ADD_LIMIT_EXHAUSTED;
+		}
+
+		newItem->_init(pid, respawnProtect, imgFile);
+
+		//add root process to the list:
+		const t_add_status status = newItem->_addProcess(pid);
+		if (status == ADD_OK) {
+			return ADD_OK;
+		}
+		newItem->_destroy();
+		ItemCount--;
+		return ADD_LIMIT_EXHAUSTED;
+	}
+
+	t_add_status _addToExistingTree(ULONG pid, ULONG parentPid)
+	{
+		if (0 == pid) {
+			return ADD_INVALID_ITEM;
+		}
+		if (0 == parentPid) {
+			return ADD_NO_PARENT;
+		}
+
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n.rootPid == parentPid) {
+				return n._addProcess(pid);
+			}
+		}
+
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n._containsProcess(parentPid)) {
+				return n._addProcess(pid);
+			}
+		}
+		
+		// this no parent tree found for such process
+		return ADD_NO_PARENT;
+	}
 
 	bool _destroyItems()
 	{

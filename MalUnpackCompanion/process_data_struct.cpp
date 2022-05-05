@@ -12,6 +12,30 @@ bool ProcessNode::_isDeadNode()
 	return (processList->containsItem(rootPid)) ? false : true;
 }
 
+bool ProcessNode::_isEmptyNode()
+{
+	if (!_isDeadNode() || _countProcesses() > 0) {
+		return false;
+	}
+	// all processes terminated, don't check for files:
+	if (respawnProtect == t_noresp::NORESP_NO_RESTRICTION) {
+		return true;
+	}
+	const int filesCount = _countFiles();
+	if (filesCount == 0) {
+		return true;
+	}
+	// allow for the initial file to still exist:
+	if (respawnProtect == t_noresp::NORESP_DROPPED_FILES) {
+		if (filesCount == 1) {
+			if (imgFile != FILE_INVALID_FILE_ID && _containsFile(imgFile)) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 bool ProcessNode::_containsProcess(ULONG pid)
 {
 	if (!processList) return false;
@@ -68,11 +92,22 @@ int ProcessNode::_countProcesses()
 	return processList->countItems();
 };
 
+int ProcessNode::_countFiles()
+{
+	if (!filesList) return 0;
+	return filesList->countItems();
+}
 
 bool ProcessNode::_deleteProcess(ULONG pid)
 {
 	if (!processList) return false;
 	return processList->deleteItem(pid);
+}
+
+bool ProcessNode::_deleteFile(LONGLONG fileId)
+{
+	if (!filesList) return false;
+	return filesList->deleteItem(fileId);
 }
 
 size_t ProcessNode::_copyProcessList(void* data, size_t outBufSize)

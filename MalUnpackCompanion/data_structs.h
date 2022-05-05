@@ -82,8 +82,11 @@ typedef enum {
 	ADD_ALREADY_EXIST,
 	ADD_LIMIT_EXHAUSTED,
 	ADD_INVALID_ITEM,
+	ADD_NO_PARENT,
+	ADD_FORBIDDEN,
 	ADD_STATES_COUNT
 } t_add_status;
+
 
 template<typename T>
 struct ItemsList

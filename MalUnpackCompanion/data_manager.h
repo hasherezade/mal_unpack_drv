@@ -25,6 +25,8 @@ namespace Data {
 
     t_add_status AddProcess(ULONG pid, ULONG parentPid);
 
+    t_add_status AddProcessNode(ULONG pid, LONGLONG imgFileId, t_noresp respawnProtect);
+
     t_add_status AddProcessToFileOwner(ULONG PID, LONGLONG fileId);
 
     bool IsProcessInFileOwners(ULONG pid1, LONGLONG fileId);
@@ -32,6 +34,8 @@ namespace Data {
     int CountProcessTrees();
 
     bool DeleteProcess(ULONG pid);
+
+    bool DeleteFile(LONGLONG fileId);
 
     size_t CopyProcessList(ULONG rootPid, void* data, size_t outBufSize);
 

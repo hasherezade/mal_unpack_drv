@@ -13,6 +13,7 @@
 
 #include "process_util.h"
 #include "file_util.h"
+#include "util.h"
 
 #define SLEEP_TIME 1000
 
@@ -227,27 +228,29 @@ NTSTATUS HandleCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	return openStatus;
 }
 
-template<typename DATA_BUF>
-NTSTATUS FetchInputBuffer(PIRP Irp, DATA_BUF** inpData)
+NTSTATUS FetchInputBufferOfMinSize(IN PIRP Irp, OUT void** inpData, IN const size_t inpDataSize, OUT OPTIONAL size_t *actualSize = nullptr)
 {
-	const size_t inpDataSize = sizeof(DATA_BUF);
 	if (!Irp || inpData == nullptr) {
 		return STATUS_UNSUCCESSFUL;
 	}
 	PIO_STACK_LOCATION stack = IoGetCurrentIrpStackLocation(Irp);
 	ULONG method = IO_METHOD_FROM_CTL_CODE(stack->Parameters.DeviceIoControl.IoControlCode);
 
+	size_t InputBufferLength = 0;
+
 	if (method == METHOD_BUFFERED) {
-		if (stack->Parameters.DeviceIoControl.InputBufferLength < inpDataSize) {
+		InputBufferLength = stack->Parameters.DeviceIoControl.InputBufferLength;
+		if (InputBufferLength < inpDataSize) {
 			return STATUS_BUFFER_TOO_SMALL;
 		}
-		*inpData = (DATA_BUF*)Irp->AssociatedIrp.SystemBuffer;
+		*inpData = Irp->AssociatedIrp.SystemBuffer;
 	}
 	else if (method == METHOD_NEITHER) {
-		if (stack->Parameters.DeviceIoControl.InputBufferLength < inpDataSize) {
+		InputBufferLength = stack->Parameters.DeviceIoControl.InputBufferLength;
+		if (InputBufferLength < inpDataSize) {
 			return STATUS_BUFFER_TOO_SMALL;
 		}
-		*inpData = (DATA_BUF*)stack->Parameters.DeviceIoControl.Type3InputBuffer;
+		*inpData = stack->Parameters.DeviceIoControl.Type3InputBuffer;
 	}
 	else {
 		return STATUS_NOT_SUPPORTED;
@@ -255,12 +258,28 @@ NTSTATUS FetchInputBuffer(PIRP Irp, DATA_BUF** inpData)
 	if (*inpData == nullptr) {
 		return STATUS_INVALID_PARAMETER;
 	}
-	return STATUS_SUCCESS; 
+	if (actualSize) {
+		*actualSize = InputBufferLength;
+	}
+	return STATUS_SUCCESS;
+}
+
+template<typename DATA_BUF>
+NTSTATUS FetchInputBuffer(PIRP Irp, DATA_BUF** inpData)
+{
+	if (!Irp || inpData == nullptr) {
+		return STATUS_UNSUCCESSFUL;
+	}
+	const size_t inpDataSize = sizeof(DATA_BUF);
+	return FetchInputBufferOfMinSize(Irp, (void**)inpData, inpDataSize);
 }
 
 //---
-t_add_status _AddProcessWatch(ULONG PID, ULONGLONG FileId = FILE_INVALID_FILE_ID)
+t_add_status _AddProcessWatch(ProcessDataEx &settings)
 {
+	const ULONG PID = settings.Pid;
+	const LONGLONG FileId = settings.fileId;
+
 	PEPROCESS Process;
 	NTSTATUS status = PsLookupProcessByProcessId(ULongToHandle(PID), &Process);
 	if (!NT_SUCCESS(status)) {
@@ -270,42 +289,61 @@ t_add_status _AddProcessWatch(ULONG PID, ULONGLONG FileId = FILE_INVALID_FILE_ID
 
 	ObDereferenceObject(Process);
 
-	DbgPrint(DRIVER_PREFIX ": Watching process requested %d\n", PID);
-	t_add_status add_status = Data::AddProcess(PID, 0);
+	DbgPrint(DRIVER_PREFIX ": Watching process requested %d, noresp=%d\n", PID, settings.noresp);
+	t_add_status add_status = Data::AddProcessNode(PID, FileId, settings.noresp);
 	if (status == ADD_OK && FileId != FILE_INVALID_FILE_ID) {
-		Data::AddFile(FileId, PID);
-		DbgPrint(DRIVER_PREFIX ": Watching process file %llx\n", FileId);
+		if (Data::AddFile(FileId, PID) == ADD_OK) {
+			DbgPrint(DRIVER_PREFIX ": Watching process file %llx\n", FileId);
+		}
 	}
 	return add_status;
 }
 
-NTSTATUS FetchProcessData(PIRP Irp, ULONG& pid, LONGLONG& fileId)
+NTSTATUS FetchProcessData(PIRP Irp, ProcessDataEx &settings)
 {
-	ProcessDataEx* inpDataEx = nullptr;
-	NTSTATUS status = FetchInputBuffer(Irp, &inpDataEx);
-	if (NT_SUCCESS(status)) {
-		pid = inpDataEx->Id;
-		fileId = inpDataEx->fileId;
-		return status;
+	NTSTATUS status = STATUS_INVALID_PARAMETER;
+	// v2:
+	{
+		ProcessDataEx_v2* inpDataEx2 = nullptr;
+		status = FetchInputBuffer(Irp, &inpDataEx2);
+		if (NT_SUCCESS(status)) {
+			settings.Pid = inpDataEx2->Pid;
+			settings.fileId = inpDataEx2->fileId;
+			settings.noresp = inpDataEx2->noresp;
+			return status;
+		}
 	}
-	ProcessData* inpData = nullptr;
-	status = FetchInputBuffer(Irp, &inpData);
-	if (NT_SUCCESS(status)) {
-		pid = inpData->Id;
+	// v1:
+	{
+		ProcessDataEx_v1* inpDataEx = nullptr;
+		status = FetchInputBuffer(Irp, &inpDataEx);
+		if (NT_SUCCESS(status)) {
+			settings.Pid = inpDataEx->Pid;
+			settings.fileId = inpDataEx->fileId;
+			return status;
+		}
+	}
+	// basic:
+	{
+		ProcessDataBasic* inpData = nullptr;
+		status = FetchInputBuffer(Irp, &inpData);
+		if (NT_SUCCESS(status)) {
+			settings.Pid = inpData->Pid;
+		}
 	}
 	return status;
 }
 
-
 NTSTATUS AddProcessWatch(PIRP Irp)
 {
-	ULONG pid = 0;
-	LONGLONG fileId = FILE_INVALID_FILE_ID;
-	NTSTATUS status = FetchProcessData(Irp, pid, fileId);
+	ProcessDataEx settings = { 0 };
+	settings.fileId = FILE_INVALID_FILE_ID;
+
+	NTSTATUS status = FetchProcessData(Irp, settings);
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
-	const t_add_status ret = _AddProcessWatch(pid, fileId);
+	const t_add_status ret = _AddProcessWatch(settings);
 	switch (ret) {
 		case ADD_OK:
 		case ADD_ALREADY_EXIST:
@@ -314,20 +352,20 @@ NTSTATUS AddProcessWatch(PIRP Irp)
 			return STATUS_INVALID_PARAMETER;
 	}
 	const int count = Data::CountProcessTrees();
-	DbgPrint(DRIVER_PREFIX "[!][%zd] Failed to add process to the list. Watched nodes = %zd, add status = %d\n", pid, count, ret);
+	DbgPrint(DRIVER_PREFIX "[!][%zd] Failed to add process to the list. Watched nodes = %zd, add status = %d\n", settings.Pid, count, ret);
 	return STATUS_UNSUCCESSFUL;
 }
 
 
 NTSTATUS RemoveProcessWatch(PIRP Irp)
 {
-	ProcessData* inpData = nullptr;
+	ProcessDataBasic* inpData = nullptr;
 
 	NTSTATUS status = FetchInputBuffer(Irp, &inpData);
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
-	const ULONG PID = inpData->Id;
+	const ULONG PID = inpData->Pid;
 	DbgPrint(DRIVER_PREFIX "Removing process watch: %d\n", PID);
 	if (Data::DeleteProcess(PID)) {
 		DbgPrint(DRIVER_PREFIX "Removed from the list: %d\n", PID);
@@ -349,18 +387,63 @@ NTSTATUS _TerminateWatched(ULONG PID)
 
 NTSTATUS TerminateWatched(PIRP Irp)
 {
-	ProcessData* inpData = nullptr;
+	ProcessDataBasic* inpData = nullptr;
 
 	NTSTATUS status = FetchInputBuffer(Irp, &inpData);
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
-	return _TerminateWatched(inpData->Id);
+	return _TerminateWatched(inpData->Pid);
+}
+
+#define _TREAT_RENAMED_AS_DELETED
+NTSTATUS _DeleteWatchedFile(ULONG PID, PUNICODE_STRING FileName)
+{
+	LONGLONG fileId = FileUtil::GetFileIdByPath(FileName);
+	const ULONG fileOwnerPid = Data::GetFileOwner(fileId);
+	if (fileOwnerPid != PID) {
+		DbgPrint(DRIVER_PREFIX __FUNCTION__ "FileID = %llx, PID = %d, fileOwnerPid = %d - owner mismatch!\n", fileId, PID, fileOwnerPid);
+		return STATUS_ACCESS_DENIED;
+	}
+	NTSTATUS status = FileUtil::RequestFileDeletion(FileName);
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ "FileID = %llx, PID = %d, status = %X\n", fileId, PID, status);
+#ifdef _TREAT_RENAMED_AS_DELETED
+	if (status == STATUS_CANNOT_DELETE) {
+		if (Util::hasSuffix(FileName, RENAMED_EXTENSION)) {
+			if (Data::DeleteFile(fileId)) {
+				status = STATUS_SUCCESS;
+			}
+		}
+	}
+#endif
+	return status;
+}
+
+NTSTATUS DeleteWatchedFile(PIRP Irp)
+{
+	ProcessFileData* inpData = nullptr;
+	const size_t minimalLen = 4; // minimal length we expect valid path to be
+	const size_t minimalSize = sizeof(ProcessFileData) + (sizeof(WCHAR) * minimalLen);
+	size_t actualSize = 0;
+	NTSTATUS status = FetchInputBufferOfMinSize(Irp, (void**)&inpData, minimalSize, &actualSize);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	NT_ASSERT(actualSize > sizeof(ProcessFileData));
+	const size_t actualLen = (actualSize - sizeof(ProcessFileData)) / sizeof(WCHAR);
+	// ensure it is NULL-terminated:
+	inpData->FileName[actualLen] = L'\0';
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Passed buffer: %S len: %lld size: %lld\n", inpData->FileName, actualLen, actualSize);
+
+	UNICODE_STRING name;
+	RtlInitUnicodeString(&name, inpData->FileName);
+	KdPrint((DRIVER_PREFIX __FUNCTION__ ": Passed buffer to unicode: %wZ\n", name));
+	return _DeleteWatchedFile(inpData->Pid, &name);
 }
 
 NTSTATUS _CopyWatchedList(PIRP Irp, ULONG_PTR& outLen, bool files)
 {
-	ProcessData* inpData = nullptr;
+	ProcessDataBasic* inpData = nullptr;
 	NTSTATUS status = FetchInputBuffer(Irp, &inpData);
 	if (!NT_SUCCESS(status)) {
 		return status;
@@ -377,7 +460,7 @@ NTSTATUS _CopyWatchedList(PIRP Irp, ULONG_PTR& outLen, bool files)
 	if (outData == nullptr) {
 		return STATUS_INVALID_PARAMETER;
 	}
-	ULONG parentPid = inpData->Id;
+	ULONG parentPid = inpData->Pid;
 	size_t items = 0;
 	if (files) {
 		items = Data::CopyFilesList(parentPid, outData, outBufSize);
@@ -386,7 +469,7 @@ NTSTATUS _CopyWatchedList(PIRP Irp, ULONG_PTR& outLen, bool files)
 		items = Data::CopyProcessList(parentPid, outData, outBufSize);
 	}
 	if (items > 0) {
-		DbgPrint(DRIVER_PREFIX "Copied items to system buffer: %d\n", items);
+		KdPrint((DRIVER_PREFIX "Copied items to system buffer: %d\n", items));
 		size_t copiedSize = items * elementSize;
 		outLen = ULONG(copiedSize);
 	}
@@ -422,6 +505,23 @@ NTSTATUS FetchDriverVersion(PIRP Irp, ULONG_PTR &outLen)
 	return STATUS_SUCCESS;
 }
 
+NTSTATUS CountNodes(PIRP Irp, ULONG_PTR& outLen)
+{
+	auto counter = Data::CountProcessTrees();
+	PIO_STACK_LOCATION stack = IoGetCurrentIrpStackLocation(Irp);
+	const size_t outBufSize = stack->Parameters.DeviceIoControl.OutputBufferLength;
+	if (outBufSize < sizeof(counter)) {
+		return STATUS_BUFFER_TOO_SMALL;
+	}
+	void* outBuf = Irp->AssociatedIrp.SystemBuffer;
+	if (outBuf == nullptr) {
+		return STATUS_INVALID_PARAMETER;
+	}
+	::memcpy(outBuf, &counter, sizeof(counter));
+	outLen = sizeof(counter);
+	return STATUS_SUCCESS;
+}
+
 NTSTATUS HandleDeviceControl(PDEVICE_OBJECT, PIRP Irp)
 {
 	PIO_STACK_LOCATION stack = IoGetCurrentIrpStackLocation(Irp);
@@ -433,6 +533,11 @@ NTSTATUS HandleDeviceControl(PDEVICE_OBJECT, PIRP Irp)
 		case IOCTL_MUNPACK_COMPANION_VERSION:
 		{
 			status = FetchDriverVersion(Irp, outLen);
+			break;
+		}
+		case IOCTL_MUNPACK_COMPANION_COUNT_NODES:
+		{
+			status = CountNodes(Irp, outLen);
 			break;
 		}
 		case IOCTL_MUNPACK_COMPANION_ADD_TO_WATCHED:
@@ -450,6 +555,11 @@ NTSTATUS HandleDeviceControl(PDEVICE_OBJECT, PIRP Irp)
 		case IOCTL_MUNPACK_COMPANION_TERMINATE_WATCHED:
 		{
 			status = TerminateWatched(Irp);
+			break;
+		}
+		case IOCTL_MUNPACK_COMPANION_DELETE_WATCHED_FILE:
+		{
+			status = DeleteWatchedFile(Irp);
 			break;
 		}
 		case IOCTL_MUNPACK_COMPANION_LIST_PROCESSES:
@@ -551,7 +661,7 @@ NTSTATUS _InitializeDriver(_In_ PDRIVER_OBJECT DriverObject)
 		g_Settings.hasProcessNotify = true;
 	}
 	else {
-		KdPrint((DRIVER_PREFIX "failed to register process callback (0x%08X)\n", status));
+		DbgPrint(DRIVER_PREFIX "failed to register process callback (0x%08X)\n", status);
 		return status;
 	}
 
@@ -602,7 +712,7 @@ DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 		return STATUS_FATAL_MEMORY_EXHAUSTION;
 	}
 	else {
-		DbgPrint(DRIVER_PREFIX "Initialized global data structures!\n");
+		KdPrint((DRIVER_PREFIX "Initialized global data structures!\n"));
 	}
 
 	//
@@ -633,7 +743,7 @@ DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 	DriverObject->MajorFunction[IRP_MJ_CLOSE] = HandleCreateClose;
 	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = HandleDeviceControl;
 
-	DbgPrint(DRIVER_PREFIX "driver loaded!\n");
+	KdPrint((DRIVER_PREFIX "driver loaded!\n"));
 
 	status = _InitializeDriver(DriverObject);
 	if (NT_SUCCESS(status)) {

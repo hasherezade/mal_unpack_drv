@@ -13,5 +13,7 @@ namespace FileUtil {
     NTSTATUS FetchFileSize(HANDLE hFile, LONGLONG& FileSize);
 
     LONGLONG GetFileIdByPath(PUNICODE_STRING FileName);
+
+    NTSTATUS RequestFileDeletion(PUNICODE_STRING FileName);
 };
 
