@@ -108,7 +108,7 @@ void OnImageLoadNotify(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_I
 #ifdef _RETRIEVE_PATH
 	UNREFERENCED_PARAMETER(FullImageName);
 	// retrieve image path manually: backward compatibility with Windows < 10
-	WCHAR FileName[FileUtil::MAX_PATH_LEN] = { 0 };
+	WCHAR FileName[MAX_PATH_LEN] = { 0 };
 	if (!FileUtil::RetrieveImagePath(ImageInfo, FileName)) {
 		return;
 	}
@@ -380,26 +380,36 @@ NTSTATUS TerminateWatched(PIRP Irp)
 	return _TerminateWatched(inpData->Pid);
 }
 
-NTSTATUS _DeleteWatchedFile(ULONG PID, LONGLONG fileId)
+NTSTATUS _DeleteWatchedFile(ULONG PID, PUNICODE_STRING FileName)
 {
+	LONGLONG fileId = FileUtil::GetFileIdByPath(FileName);
 	const ULONG fileOwnerPid = Data::GetFileOwner(fileId);
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ "< FileID = %llx, PID = %d, fileOwnerPid = %d\n", fileId, PID, fileOwnerPid);
 	if (fileOwnerPid != PID) {
 		return STATUS_ACCESS_DENIED;
 	}
-	NTSTATUS status = FileUtil::RequestFileDeletion(fileId);
+	NTSTATUS status = FileUtil::RequestFileDeletion(FileName);
 	DbgPrint(DRIVER_PREFIX __FUNCTION__ "< FileID = %llx, PID = %d, status = %X\n", fileId, PID, status);
 	return status;
 }
 
 NTSTATUS DeleteWatchedFile(PIRP Irp)
 {
-	ProcessDataEx_v1* inpData = nullptr;
+	ProcessFileData* inpData = nullptr;
 
 	NTSTATUS status = FetchInputBuffer(Irp, &inpData);
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
-	return _DeleteWatchedFile(inpData->Pid, inpData->fileId);
+	// ensure it is NULL-terminated:
+	inpData->FileName[MAX_PATH_LEN - 1] = L'\0';
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ "Passed buffer: %S\n", inpData->FileName);
+
+	UNICODE_STRING name;
+	RtlInitUnicodeString(&name, inpData->FileName);
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ "Passed buffer to unicode: %wZ\n", name);
+
+	return _DeleteWatchedFile(inpData->Pid, &name);
 }
 
 NTSTATUS _CopyWatchedList(PIRP Irp, ULONG_PTR& outLen, bool files)
