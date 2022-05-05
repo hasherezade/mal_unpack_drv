@@ -193,6 +193,7 @@
     <ClInclude Include="process_data_struct.h" />
     <ClInclude Include="process_util.h" />
     <ClInclude Include="undoc_api.h" />
+    <ClInclude Include="util.h" />
     <ClInclude Include="version.h" />
   </ItemGroup>
   <ItemGroup>

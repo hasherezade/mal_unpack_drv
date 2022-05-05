@@ -13,6 +13,7 @@
 
 #include "process_util.h"
 #include "file_util.h"
+#include "util.h"
 
 #define SLEEP_TIME 1000
 
@@ -20,6 +21,7 @@
 #define ALTITUDE_REGISTRY_FILTER L"7657.124"
 
 #define SUPPORTED_CLIENT_NAME L"\\mal_unpack.exe"
+#define IGNORED_EXTENSION L".unsafe"
 
 #define IO_METHOD_FROM_CTL_CODE(cltCode) (cltCode & 0x00000003)
 
@@ -380,6 +382,7 @@ NTSTATUS TerminateWatched(PIRP Irp)
 	return _TerminateWatched(inpData->Pid);
 }
 
+#define _TREAT_RENAMED_AS_DELETED
 NTSTATUS _DeleteWatchedFile(ULONG PID, PUNICODE_STRING FileName)
 {
 	LONGLONG fileId = FileUtil::GetFileIdByPath(FileName);
@@ -390,6 +393,15 @@ NTSTATUS _DeleteWatchedFile(ULONG PID, PUNICODE_STRING FileName)
 	}
 	NTSTATUS status = FileUtil::RequestFileDeletion(FileName);
 	DbgPrint(DRIVER_PREFIX __FUNCTION__ "< FileID = %llx, PID = %d, status = %X\n", fileId, PID, status);
+#ifdef _TREAT_RENAMED_AS_DELETED
+	if (status == STATUS_CANNOT_DELETE) {
+		if (Util::hasSuffix(FileName, IGNORED_EXTENSION)) {
+			if (Data::DeleteFile(fileId)) {
+				status = STATUS_SUCCESS;
+			}
+		}
+	}
+#endif
 	return status;
 }
 
@@ -408,7 +420,6 @@ NTSTATUS DeleteWatchedFile(PIRP Irp)
 	UNICODE_STRING name;
 	RtlInitUnicodeString(&name, inpData->FileName);
 	DbgPrint(DRIVER_PREFIX __FUNCTION__ "Passed buffer to unicode: %wZ\n", name);
-
 	return _DeleteWatchedFile(inpData->Pid, &name);
 }
 
