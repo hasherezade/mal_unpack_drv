@@ -225,7 +225,6 @@ public:
 		}
 		// if this file belongs to a dead node, delete the association first:
 		const t_delete_status delStatus = _deletePreviousFileAssociation(fileId, parentPid);
-		//DbgPrint(DRIVER_PREFIX __FUNCTION__ "_deletePreviousFileAssociation: status= %d, file: %llx, \n",  delStatus, fileId);
 		if (delStatus == DELETE_FORBIDDEN) {
 			return ADD_FORBIDDEN;
 		}
@@ -555,10 +554,9 @@ private:
 		//create a new node for the process:
 		ProcessNode* newItem = _getNewItemPtr();
 		if (!newItem) {
-			DbgPrint(DRIVER_PREFIX __FUNCTION__ "Could not get a new node, failed to add pid: %d!\n", pid);
 			return ADD_LIMIT_EXHAUSTED;
 		}
-		DbgPrint(DRIVER_PREFIX "Adding new root node: %d!\n", pid);
+
 		newItem->_init(pid, respawnProtect, imgFile);
 
 		//add root process to the list:
@@ -566,8 +564,6 @@ private:
 		if (status == ADD_OK) {
 			return ADD_OK;
 		}
-
-		DbgPrint(DRIVER_PREFIX "Failed to add the node: %d!\n", pid);
 		newItem->_destroy();
 		ItemCount--;
 		return ADD_LIMIT_EXHAUSTED;
