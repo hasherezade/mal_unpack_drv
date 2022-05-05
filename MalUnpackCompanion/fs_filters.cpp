@@ -5,6 +5,8 @@ namespace FltUtil {
 
 	NTSTATUS GetFileId(PCFLT_RELATED_OBJECTS FltObjects, PFLT_CALLBACK_DATA Data, LONGLONG& FileId, char *caller)
 	{
+		UNREFERENCED_PARAMETER(caller);
+
 		FileId = FILE_INVALID_FILE_ID;
 
 		if (!Data || !FltObjects) {
@@ -18,7 +20,7 @@ namespace FltUtil {
 				status != STATUS_OBJECT_NAME_INVALID &&
 				status != STATUS_OBJECT_PATH_NOT_FOUND)
 			{
-				DbgPrint(DRIVER_PREFIX "[!!!][%s] Failed to get filename information, status: %X\n", caller, status);
+				KdPrint((DRIVER_PREFIX "[!!!][%s] Failed to get filename information, status: %X\n", caller, status));
 			}
 			return status;
 		}
@@ -81,7 +83,7 @@ namespace FltUtil {
 				status != STATUS_OBJECT_NAME_INVALID &&
 				status != STATUS_OBJECT_PATH_NOT_FOUND)
 			{
-				DbgPrint(DRIVER_PREFIX __FUNCTION__ "[!!!] Failed to get filename information, status: %X\n", status);
+				KdPrint((DRIVER_PREFIX __FUNCTION__ "[!!!] Failed to get filename information, status: %X\n", status));
 			}
 			return status;
 		}
@@ -167,7 +169,7 @@ bool _SetFileContext(PCFLT_RELATED_OBJECTS FltObjects, ULONG sourcePID, LONGLONG
 	FileContext* ctx = nullptr; //STATUS_FLT_CONTEXT_ALLOCATION_NOT_FOUND
 	NTSTATUS ctx_status = FltAllocateContext(FltObjects->Filter, FLT_FILE_CONTEXT, sizeof(FileContext), PagedPool, (PFLT_CONTEXT*)&ctx);
 	if (!NT_SUCCESS(ctx_status)) {
-		DbgPrint(DRIVER_PREFIX "[ERR][CTX][%s][% llX] Creating the context failed : % x\n", caller, fileId, ctx_status);
+		DbgPrint(DRIVER_PREFIX "[CTX][ERR][%s][% llX] Creating the context failed : % x\n", caller, fileId, ctx_status);
 		return false;
 	}
 	bool isSet = false;
@@ -175,12 +177,12 @@ bool _SetFileContext(PCFLT_RELATED_OBJECTS FltObjects, ULONG sourcePID, LONGLONG
 	ctx->sourcePID = sourcePID;
 	ctx_status = FltSetFileContext(FltObjects->Instance, FltObjects->FileObject, FLT_SET_CONTEXT_KEEP_IF_EXISTS, ctx, nullptr);
 	if (NT_SUCCESS(ctx_status)) {
-		DbgPrint(DRIVER_PREFIX " [CTX][%s][%llX] Attached the context to the file\n", caller, fileId);
+		KdPrint((DRIVER_PREFIX "[CTX][OK][%s][%llX] Attached the context to the file\n", caller, fileId));
 		isSet = true;
 	}
 	else {
 		if (ctx_status != STATUS_NOT_SUPPORTED && ctx_status != STATUS_FLT_CONTEXT_ALREADY_DEFINED) {
-			DbgPrint(DRIVER_PREFIX "[ERR][CTX][%s][% llX] Attaching the context failed : % x\n", caller, fileId, ctx_status);
+			DbgPrint(DRIVER_PREFIX "[CTX][ERR][%s][% llX] Attaching the context failed : % x\n", caller, fileId, ctx_status);
 		}
 	}
 	FltReleaseContext(ctx); ctx = nullptr;
@@ -190,19 +192,20 @@ bool _SetFileContext(PCFLT_RELATED_OBJECTS FltObjects, ULONG sourcePID, LONGLONG
 
 LONGLONG _GetFileIdFromContext(PFLT_INSTANCE CONST Instance, PFILE_OBJECT CONST FileObject, char* caller)
 {
+	UNREFERENCED_PARAMETER(caller);
 	LONGLONG fileId = FILE_INVALID_FILE_ID;
 	FileContext* ctx = nullptr;
 	NTSTATUS ctx_status = FltGetFileContext(Instance, FileObject, (PFLT_CONTEXT*)&ctx);
 	if (NT_SUCCESS(ctx_status)) {
 		if (ctx) {
 			fileId = ctx->fileId;
-			DbgPrint(DRIVER_PREFIX " [CTX][%s] Retrieved fileID: %llX\n", caller, fileId);
+			KdPrint((DRIVER_PREFIX "[CTX][OK][%s] Retrieved fileID: %llX\n", caller, fileId));
 		}
 		FltReleaseContext(ctx); ctx = nullptr;
 	}
-	/*else {
-		DbgPrint(DRIVER_PREFIX " [ERROR][CTX][%s] Couldn't get file context, status: %x\n", caller, ctx_status);
-	}*/
+	else {
+		KdPrint((DRIVER_PREFIX "[CTX][ERR][%s] Couldn't get file context, status: %x\n", caller, ctx_status));
+	}
 	return fileId;
 }
 
@@ -255,8 +258,10 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 				return FLT_PREOP_COMPLETE;
 			}
 			//if could not check the file ID, and the file will be written, deny the access
-			DbgPrint(DRIVER_PREFIX __FUNCTION__ " [%d] [!] Could not retrieve ID of the file (status= %X), createDisposition: %X, DesiredAccess: %X-> ACCESS_DENIED!\n",
-				sourcePID, fileIdStatus, createDisposition, DesiredAccess);
+			DbgPrint(DRIVER_PREFIX " [%d][!][%s] Could not retrieve ID of the file (status= %X), createDisposition: %X, DesiredAccess: %X-> ACCESS_DENIED!\n",
+				sourcePID, 
+				__FUNCTION__,
+				fileIdStatus, createDisposition, DesiredAccess);
 			
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 			return FLT_PREOP_COMPLETE;
@@ -318,10 +323,10 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 
 	// Check if it is creating a new file:
 	if (FltUtil::IsCreateOrOverwrite(Data, FltObjects)) {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__ " [%d] Creating a new OWNED fileID: %zX fileIdStatus: %X\n", sourcePID, fileId, fileIdStatus);
+		DbgPrint(DRIVER_PREFIX "[%d][%s] Creating a new OWNED fileID: %zX fileIdStatus: %X\n", sourcePID, __FUNCTION__, fileId, fileIdStatus);
 		const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
 		if (fileName) {
-			DbgPrint(DRIVER_PREFIX "[%llX] file Name: %wZ \n", fileId, fileName);
+			DbgPrint(DRIVER_PREFIX "[%llX] file Name: %wZ\n", fileId, fileName);
 		}
 		// assign this file to the process that created it:
 		const t_add_status add_status =  Data::AddFile(fileId, sourcePID);
@@ -329,10 +334,10 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 			_SetFileContext(FltObjects, sourcePID, fileId, __FUNCTION__);
 		}
 		if (add_status == ADD_LIMIT_EXHAUSTED) {
-			DbgPrint(DRIVER_PREFIX __FUNCTION__" [%llX] Could not add to the files watchlist: limit exhausted\n", fileId);
+			DbgPrint(DRIVER_PREFIX "[%llX][%s] Could not add to the files watchlist: limit exhausted\n", fileId, __FUNCTION__);
 		}
 		if (add_status == ADD_FORBIDDEN) {
-			DbgPrint(DRIVER_PREFIX __FUNCTION__" [%llX] Could not add to the file to watchlist: already associated with other process\n", fileId);
+			DbgPrint(DRIVER_PREFIX "[%llX][%s] Could not add to the file to watchlist: already associated with other process\n", fileId, __FUNCTION__);
 		}
 	}
 	return FLT_POSTOP_FINISHED_PROCESSING;
@@ -439,9 +444,9 @@ FLT_POSTOP_CALLBACK_STATUS MyPostCleanup(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_
 
 	LONGLONG fileId = _GetFileIdFromContext(FltObjects->Instance, FltObjects->FileObject, __FUNCTION__);
 	if (fileId != FILE_INVALID_FILE_ID) {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__" >>> The watched file was deleted: %llx\n", fileId);
+		DbgPrint(DRIVER_PREFIX __FUNCTION__" >>> The watched file was deleted from the disk: %llx\n", fileId);
 		if (Data::DeleteFile(fileId)) {
-			DbgPrint(DRIVER_PREFIX __FUNCTION__" >>> DELETED from the list: %llx\n", fileId);
+			DbgPrint(DRIVER_PREFIX __FUNCTION__" >>> DELETED from the watch list: %llx\n", fileId);
 		}
 	}
 	return FLT_POSTOP_FINISHED_PROCESSING;
@@ -456,7 +461,7 @@ MyFilterUnload(
 	UNREFERENCED_PARAMETER(Flags);
 	PAGED_CODE();
 
-	DbgPrint(DRIVER_PREFIX "MyFilterUnload: Entered\n");
+	KdPrint((DRIVER_PREFIX "MyFilterUnload: Entered\n"));
 	FltUnregisterFilter(g_Settings.gFilterHandle);
 	g_Settings.gFilterHandle = NULL;
 
@@ -479,7 +484,7 @@ MyFilterInstanceSetup(
 
 	PAGED_CODE();
 
-	DbgPrint(DRIVER_PREFIX "MyFilterInstanceSetup: Entered\n");
+	KdPrint((DRIVER_PREFIX "MyFilterInstanceSetup: Entered\n"));
 	return STATUS_SUCCESS;
 }
 
@@ -495,7 +500,7 @@ MyFilterInstanceQueryTeardown(
 
 	PAGED_CODE();
 
-	DbgPrint(DRIVER_PREFIX "MyFilterInstanceQueryTeardown: Entered\n");
+	KdPrint((DRIVER_PREFIX "MyFilterInstanceQueryTeardown: Entered\n"));
 	return STATUS_SUCCESS;
 }
 
@@ -510,7 +515,7 @@ MyFilterInstanceTeardownStart(
 
 	PAGED_CODE();
 
-	DbgPrint(DRIVER_PREFIX "MyFilterInstanceTeardownStart: Entered\n");
+	KdPrint((DRIVER_PREFIX "MyFilterInstanceTeardownStart: Entered\n"));
 }
 
 
@@ -525,5 +530,5 @@ MyFilterInstanceTeardownComplete(
 
 	PAGED_CODE();
 
-	DbgPrint(DRIVER_PREFIX "MyFilterInstanceTeardownComplete: Entered\n");
+	KdPrint((DRIVER_PREFIX "MyFilterInstanceTeardownComplete: Entered\n"));
 }

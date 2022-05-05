@@ -102,15 +102,14 @@ int Data::CountProcessTrees()
 bool Data::DeleteProcess(ULONG pid)
 {
 	bool isOk = g_ProcessNode.DeleteProcess(pid);
-	DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Watched nodes: %d\n", g_ProcessNode.CountNodes());
+	KdPrint((DRIVER_PREFIX __FUNCTION__ ": Watched nodes: %d\n", g_ProcessNode.CountNodes()));
 	return isOk;
 }
 
 bool Data::DeleteFile(LONGLONG fileId)
 {
-	DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Watched nodes before: %d\n", g_ProcessNode.CountNodes());
 	bool isOk = g_ProcessNode.DeleteFile(fileId);
-	DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Watched nodes after: %d\n", g_ProcessNode.CountNodes());
+	KdPrint((DRIVER_PREFIX __FUNCTION__ ": Watched nodes: %d\n", g_ProcessNode.CountNodes()));
 	return isOk;
 }
 

@@ -402,12 +402,12 @@ NTSTATUS _DeleteWatchedFile(ULONG PID, PUNICODE_STRING FileName)
 {
 	LONGLONG fileId = FileUtil::GetFileIdByPath(FileName);
 	const ULONG fileOwnerPid = Data::GetFileOwner(fileId);
-	DbgPrint(DRIVER_PREFIX __FUNCTION__ "< FileID = %llx, PID = %d, fileOwnerPid = %d\n", fileId, PID, fileOwnerPid);
 	if (fileOwnerPid != PID) {
+		DbgPrint(DRIVER_PREFIX __FUNCTION__ "FileID = %llx, PID = %d, fileOwnerPid = %d - owner mismatch!\n", fileId, PID, fileOwnerPid);
 		return STATUS_ACCESS_DENIED;
 	}
 	NTSTATUS status = FileUtil::RequestFileDeletion(FileName);
-	DbgPrint(DRIVER_PREFIX __FUNCTION__ "< FileID = %llx, PID = %d, status = %X\n", fileId, PID, status);
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ "FileID = %llx, PID = %d, status = %X\n", fileId, PID, status);
 #ifdef _TREAT_RENAMED_AS_DELETED
 	if (status == STATUS_CANNOT_DELETE) {
 		if (Util::hasSuffix(FileName, IGNORED_EXTENSION)) {
@@ -434,11 +434,11 @@ NTSTATUS DeleteWatchedFile(PIRP Irp)
 	const size_t actualLen = (actualSize - sizeof(ProcessFileData)) / sizeof(WCHAR);
 	// ensure it is NULL-terminated:
 	inpData->FileName[actualLen] = L'\0';
-	DbgPrint(DRIVER_PREFIX __FUNCTION__ "Passed buffer: %S len: %lld size: %lld\n", inpData->FileName, actualLen, actualSize);
+	DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Passed buffer: %S len: %lld size: %lld\n", inpData->FileName, actualLen, actualSize);
 
 	UNICODE_STRING name;
 	RtlInitUnicodeString(&name, inpData->FileName);
-	DbgPrint(DRIVER_PREFIX __FUNCTION__ "Passed buffer to unicode: %wZ\n", name);
+	KdPrint((DRIVER_PREFIX __FUNCTION__ ": Passed buffer to unicode: %wZ\n", name));
 	return _DeleteWatchedFile(inpData->Pid, &name);
 }
 
@@ -470,7 +470,7 @@ NTSTATUS _CopyWatchedList(PIRP Irp, ULONG_PTR& outLen, bool files)
 		items = Data::CopyProcessList(parentPid, outData, outBufSize);
 	}
 	if (items > 0) {
-		DbgPrint(DRIVER_PREFIX "Copied items to system buffer: %d\n", items);
+		KdPrint((DRIVER_PREFIX "Copied items to system buffer: %d\n", items));
 		size_t copiedSize = items * elementSize;
 		outLen = ULONG(copiedSize);
 	}
@@ -662,7 +662,7 @@ NTSTATUS _InitializeDriver(_In_ PDRIVER_OBJECT DriverObject)
 		g_Settings.hasProcessNotify = true;
 	}
 	else {
-		KdPrint((DRIVER_PREFIX "failed to register process callback (0x%08X)\n", status));
+		DbgPrint(DRIVER_PREFIX "failed to register process callback (0x%08X)\n", status);
 		return status;
 	}
 
@@ -713,7 +713,7 @@ DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 		return STATUS_FATAL_MEMORY_EXHAUSTION;
 	}
 	else {
-		DbgPrint(DRIVER_PREFIX "Initialized global data structures!\n");
+		KdPrint((DRIVER_PREFIX "Initialized global data structures!\n"));
 	}
 
 	//
@@ -744,7 +744,7 @@ DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 	DriverObject->MajorFunction[IRP_MJ_CLOSE] = HandleCreateClose;
 	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = HandleDeviceControl;
 
-	DbgPrint(DRIVER_PREFIX "driver loaded!\n");
+	KdPrint((DRIVER_PREFIX "driver loaded!\n"));
 
 	status = _InitializeDriver(DriverObject);
 	if (NT_SUCCESS(status)) {
