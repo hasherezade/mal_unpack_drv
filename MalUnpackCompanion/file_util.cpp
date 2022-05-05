@@ -109,7 +109,7 @@ LONGLONG FileUtil::GetFileIdByPath(PUNICODE_STRING FileName)
     LONGLONG FileId = FILE_INVALID_FILE_ID;
     __try
     {
-        HANDLE hFile;
+        HANDLE hFile = NULL;
         IO_STATUS_BLOCK ioStatusBlock;
         NTSTATUS status = ZwCreateFile(&hFile, 
             SYNCHRONIZE | FILE_READ_ATTRIBUTES,
@@ -149,7 +149,7 @@ NTSTATUS FileUtil::RequestFileDeletion(PUNICODE_STRING FileName)
     InitializeObjectAttributes(&objAttr, FileName, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
     __try
     {
-        HANDLE hFile;
+        HANDLE hFile = NULL;
         IO_STATUS_BLOCK ioStatusBlock;
         status = ZwCreateFile(&hFile,
             SYNCHRONIZE | DELETE,
@@ -167,11 +167,11 @@ NTSTATUS FileUtil::RequestFileDeletion(PUNICODE_STRING FileName)
             if (NT_SUCCESS(status)) {
                 status = ioStatusBlock.Status;
             }
+            ZwClose(hFile);
         }
         else {
             DbgPrint(DRIVER_PREFIX "[!!!] Failed to set the file for deletion, status %X\n", status);
         }
-        ZwClose(hFile);
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
