@@ -80,6 +80,21 @@ bool ProcessUtil::ShowProcessPath(const PEPROCESS Process)
 	return found;
 }
 
+NTSTATUS SetProcessNonCritical(HANDLE hProcess)
+{
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	__try
+	{
+		ULONG IsCritical = 0;
+		status = ZwSetInformationProcess(hProcess, ProcessBreakOnTermination, &IsCritical, sizeof(ULONG));
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		status = GetExceptionCode();
+	}
+	return status;
+}
+
 NTSTATUS ProcessUtil::TerminateProcess(ULONG PID)
 {
 	NTSTATUS status = STATUS_SUCCESS;
@@ -96,6 +111,9 @@ NTSTATUS ProcessUtil::TerminateProcess(ULONG PID)
 	status = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &ObjectAttributes, &ClientId);
 	if (NT_SUCCESS(status))
 	{
+		if (SetProcessNonCritical(hProcess)) {
+			DbgPrint(DRIVER_PREFIX "SetProcessNonCritical failed with status : %X\n", status);
+		}
 		status = ZwTerminateProcess(hProcess, 0);
 		//the terminate operation is already pending
 		if (status == STATUS_PROCESS_IS_TERMINATING) {
@@ -103,7 +121,7 @@ NTSTATUS ProcessUtil::TerminateProcess(ULONG PID)
 			DbgPrint(DRIVER_PREFIX "The terminate operation is already pending\n", status);
 		}
 		if (!NT_SUCCESS(status)) {
-			DbgPrint(DRIVER_PREFIX "ZwTerminateProcess failed with status : %08X\n", status);
+			DbgPrint(DRIVER_PREFIX "ZwTerminateProcess failed with status : %X\n", status);
 		}
 		ZwClose(hProcess);
 	}
