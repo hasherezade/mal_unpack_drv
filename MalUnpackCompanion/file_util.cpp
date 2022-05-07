@@ -65,7 +65,7 @@ NTSTATUS FileUtil::FetchFileId(HANDLE hFile, LONGLONG &FileId)
 
 NTSTATUS FileUtil::FetchFileSize(HANDLE hFile, LONGLONG& FileSize)
 {
-    FileSize = (-1);
+    FileSize = INVALID_FILE_SIZE;
 
     if (!hFile) {
         return STATUS_INVALID_PARAMETER;
@@ -83,7 +83,10 @@ NTSTATUS FileUtil::FetchFileSize(HANDLE hFile, LONGLONG& FileSize)
             sizeof(fileInfo),
             FileStandardInformation
         );
-        if (NT_SUCCESS(status) && !fileInfo.Directory) {
+        if (NT_SUCCESS(status) && 
+            NT_SUCCESS(ioStatusBlock.Status) && 
+            !fileInfo.Directory) 
+        {
             FileSize = fileInfo.EndOfFile.QuadPart;
         }
     }

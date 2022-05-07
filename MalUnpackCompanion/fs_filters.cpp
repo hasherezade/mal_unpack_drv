@@ -57,7 +57,7 @@ namespace FltUtil {
 	//WARNING: use it only after the object is verified, otherwise it can cause crash!
 	NTSTATUS FltGetFileSize(PCFLT_RELATED_OBJECTS FltObjects, LONGLONG& myFileSize)
 	{
-		myFileSize = (-1);
+		myFileSize = INVALID_FILE_SIZE;
 		if (!FltObjects) {
 			return STATUS_INVALID_PARAMETER;
 		}
@@ -71,7 +71,7 @@ namespace FltUtil {
 
 	NTSTATUS GetFileSize(PCFLT_RELATED_OBJECTS FltObjects, PFLT_CALLBACK_DATA Data, LONGLONG& myFileSize)
 	{
-		myFileSize = (-1);
+		myFileSize = INVALID_FILE_SIZE;
 		if (!Data || !FltObjects) {
 			return STATUS_INVALID_PARAMETER;
 		}
@@ -140,9 +140,12 @@ namespace FltUtil {
 		const bool isAnyCreate = _IsAnyCreateOverwriteDisp(createDisposition);
 
 		// Retrieve file size:
-		LONGLONG FileSize = 0;
-		NTSTATUS fileSizeStatus = FltUtil::GetFileSize(FltObjects, Data, FileSize);
-		if (fileSizeStatus == STATUS_OBJECT_NAME_NOT_FOUND) {
+		LONGLONG FileSize = INVALID_FILE_SIZE;
+		const NTSTATUS fileSizeStatus = FltUtil::GetFileSize(FltObjects, Data, FileSize);
+
+		if (fileSizeStatus == STATUS_OBJECT_NAME_NOT_FOUND || 
+			fileSizeStatus == STATUS_OBJECT_PATH_NOT_FOUND)
+		{
 			FileSize = 0; //name not found, it is a new file
 		}
 

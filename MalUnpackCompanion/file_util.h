@@ -2,6 +2,8 @@
 
 #include "undoc_api.h"
 
+#define INVALID_FILE_SIZE (-1)
+
 namespace FileUtil {
 
     const USHORT MAX_PATH_LEN = 1024;
