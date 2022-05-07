@@ -92,7 +92,7 @@ NTSTATUS FileUtil::FetchFileSize(HANDLE hFile, LONGLONG& FileSize)
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
-        status = STATUS_UNSUCCESSFUL;
+        status = GetExceptionCode();
         DbgPrint(DRIVER_PREFIX __FUNCTION__" [!!!] Exception thrown\n");
     }
     return status;
