@@ -148,9 +148,9 @@ namespace FltUtil {
 		{
 			FileSize = 0; //name not found, it is a new file
 		}
-
-		// Check if it is creating a new file:
-		if ((FileSize == 0) && isAnyCreate)
+		// Check if it is creating a new file or replacing empty:
+		if ((FILE_CREATE == createDisposition)
+			|| ((FileSize == 0) && isAnyCreate))
 		{
 			const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
 			KdPrint((DRIVER_PREFIX __FUNCTION__ ": Requested creating new file, createDisposition %X, DesiredAccess %X, isAnyCreate: %X, fileSize: %llX\n",
@@ -303,18 +303,11 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 	}
 
 	auto& params = Data->Iopb->Parameters.Create;
-
 	if (params.Options & FILE_DIRECTORY_FILE) {
 		// this is a directory, do not interfere
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
-	//even if the flag FILE_DIRECTORY_FILE is not specfied explicitly, it may still be a directory...
-	BOOLEAN isDirectory = FALSE;
-	NTSTATUS status = FltIsDirectory(FltObjects->FileObject, FltObjects->Instance, &isDirectory);
-	if (NT_SUCCESS(status) && isDirectory) {
-		// this is a directory, do not interfere
-		return FLT_POSTOP_FINISHED_PROCESSING;
-	}
+
 	const ULONG sourcePID = HandleToULong(PsGetCurrentProcessId()); //the PID of the process performing the operation
 	if (!Data::ContainsProcess(sourcePID)) {
 		return FLT_POSTOP_FINISHED_PROCESSING; // not a watched process, do not interfere
@@ -328,8 +321,10 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
-	// Check if it is creating a new file:
-	if (FltUtil::IsCreateOrOverwriteEmpty(Data, FltObjects)) {
+	if (Data->IoStatus.Information == FILE_CREATED ||
+		Data->IoStatus.Information == FILE_OVERWRITTEN ||
+		Data->IoStatus.Information == FILE_SUPERSEDED)
+	{
 		DbgPrint(DRIVER_PREFIX "[%d][%s] Creating a new OWNED fileID: %zX fileIdStatus: %X\n", sourcePID, __FUNCTION__, fileId, fileIdStatus);
 		const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
 		if (fileName) {
@@ -345,6 +340,13 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		}
 		if (add_status == ADD_FORBIDDEN) {
 			DbgPrint(DRIVER_PREFIX "[%llX][%s] Could not add to the file to watchlist: already associated with other process\n", fileId, __FUNCTION__);
+		}
+		// cancel the open operation if the file was not added to the list
+		if (add_status != ADD_OK && add_status != ADD_ALREADY_EXIST) {
+			FltCancelFileOpen(FltObjects->Instance, FltObjects->FileObject);
+			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+			Data->IoStatus.Information = 0;
+			return FLT_POSTOP_FINISHED_PROCESSING;
 		}
 	}
 	return FLT_POSTOP_FINISHED_PROCESSING;
