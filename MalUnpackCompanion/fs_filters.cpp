@@ -130,7 +130,7 @@ namespace FltUtil {
 		return false;
 	}
 
-	bool IsCreateOrOverwrite(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects)
+	bool IsCreateOrOverwriteEmpty(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects)
 	{
 		if (!Data || !FltObjects) return false;
 
@@ -150,8 +150,7 @@ namespace FltUtil {
 		}
 
 		// Check if it is creating a new file:
-		if ((FILE_CREATE == createDisposition)
-			|| ((FileSize == 0) && isAnyCreate))
+		if ((FileSize == 0) && isAnyCreate)
 		{
 			const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
 			KdPrint((DRIVER_PREFIX __FUNCTION__ ": Requested creating new file, createDisposition %X, DesiredAccess %X, isAnyCreate: %X, fileSize: %llX\n",
@@ -234,7 +233,7 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 	}
 
 	// Check if it is creating a new file:
-	if (FltUtil::IsCreateOrOverwrite(Data, FltObjects)) {
+	if (FltUtil::IsCreateOrOverwriteEmpty(Data, FltObjects)) {
 		// check if adding the file is possible:
 		if (!Data::CanAddFile(sourcePID)) {
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
@@ -330,7 +329,7 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 	}
 
 	// Check if it is creating a new file:
-	if (FltUtil::IsCreateOrOverwrite(Data, FltObjects)) {
+	if (FltUtil::IsCreateOrOverwriteEmpty(Data, FltObjects)) {
 		DbgPrint(DRIVER_PREFIX "[%d][%s] Creating a new OWNED fileID: %zX fileIdStatus: %X\n", sourcePID, __FUNCTION__, fileId, fileIdStatus);
 		const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
 		if (fileName) {
