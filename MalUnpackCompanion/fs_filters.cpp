@@ -306,7 +306,13 @@ FLT_POSTOP_CALLBACK_STATUS MyFilterProtectPostCreate(PFLT_CALLBACK_DATA Data, PC
 		// this is a directory, do not interfere
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
-
+	//even if the flag FILE_DIRECTORY_FILE is not specfied explicitly, it may still be a directory...
+	BOOLEAN isDirectory = FALSE;
+	NTSTATUS status = FltIsDirectory(FltObjects->FileObject, FltObjects->Instance, &isDirectory);
+	if (NT_SUCCESS(status) && isDirectory) {
+		// this is a directory, do not interfere
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	}
 	const ULONG sourcePID = HandleToULong(PsGetCurrentProcessId()); //the PID of the process performing the operation
 	if (!Data::ContainsProcess(sourcePID)) {
 		return FLT_POSTOP_FINISHED_PROCESSING; // not a watched process, do not interfere
