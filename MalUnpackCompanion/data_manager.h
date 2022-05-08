@@ -33,6 +33,8 @@ namespace Data {
 
     int CountProcessTrees();
 
+    ULONG ContainsNode(ULONG rootPid);
+
     bool DeleteProcess(ULONG pid);
 
     bool DeleteFile(LONGLONG fileId);

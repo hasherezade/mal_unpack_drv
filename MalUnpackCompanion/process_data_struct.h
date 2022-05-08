@@ -362,6 +362,21 @@ public:
 		return 0;
 	}
 
+	BOOLEAN ContainsNode(ULONG rootPid)
+	{
+		if (0 == rootPid) return FALSE;
+
+		AutoLock<FastMutex> lock(Mutex);
+		for (int i = 0; i < ItemCount; i++)
+		{
+			ProcessNode& n = Items[i];
+			if (n.rootPid == rootPid) {
+				return TRUE;
+			}
+		}
+		return FALSE;
+	}
+
 	int CountNodes()
 	{
 		AutoLock<FastMutex> lock(Mutex);

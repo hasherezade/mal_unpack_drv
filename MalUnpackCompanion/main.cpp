@@ -522,6 +522,29 @@ NTSTATUS CountNodes(PIRP Irp, ULONG_PTR& outLen)
 	return STATUS_SUCCESS;
 }
 
+NTSTATUS ContainsNode(PIRP Irp, ULONG_PTR& outLen)
+{
+	ULONG *rootPid = nullptr;
+	NTSTATUS status = FetchInputBuffer(Irp, &rootPid);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	PIO_STACK_LOCATION stack = IoGetCurrentIrpStackLocation(Irp);
+	const size_t outBufSize = stack->Parameters.DeviceIoControl.OutputBufferLength;
+	if (outBufSize < sizeof(ULONG)) {
+		return STATUS_BUFFER_TOO_SMALL;
+	}
+	void* outBuf = Irp->AssociatedIrp.SystemBuffer;
+	if (outBuf == nullptr) {
+		return STATUS_INVALID_PARAMETER;
+	}
+	ULONG is_contained = Data::ContainsNode(*rootPid);
+	::memcpy(outBuf, &is_contained, sizeof(ULONG));
+	outLen = sizeof(is_contained);
+	return STATUS_SUCCESS;
+}
+
+
 NTSTATUS HandleDeviceControl(PDEVICE_OBJECT, PIRP Irp)
 {
 	PIO_STACK_LOCATION stack = IoGetCurrentIrpStackLocation(Irp);
@@ -538,6 +561,11 @@ NTSTATUS HandleDeviceControl(PDEVICE_OBJECT, PIRP Irp)
 		case IOCTL_MUNPACK_COMPANION_COUNT_NODES:
 		{
 			status = CountNodes(Irp, outLen);
+			break;
+		}
+		case IOCTL_MUNPACK_COMPANION_CONTAINS_NODE:
+		{
+			status = ContainsNode(Irp, outLen);
 			break;
 		}
 		case IOCTL_MUNPACK_COMPANION_ADD_TO_WATCHED:

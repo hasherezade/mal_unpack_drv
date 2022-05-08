@@ -99,6 +99,11 @@ int Data::CountProcessTrees()
 	return g_ProcessNode.CountNodes();
 }
 
+ULONG Data::ContainsNode(ULONG rootPid)
+{
+	return g_ProcessNode.ContainsNode(rootPid);
+}
+
 bool Data::DeleteProcess(ULONG pid)
 {
 	bool isOk = g_ProcessNode.DeleteProcess(pid);
