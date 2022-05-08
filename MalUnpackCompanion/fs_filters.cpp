@@ -3,6 +3,23 @@
 
 namespace FltUtil {
 
+	NTSTATUS IsNonDefaultFileStream(PCFLT_RELATED_OBJECTS FltObjects, PFLT_CALLBACK_DATA Data, BOOLEAN& isNonDefault)
+	{
+		if (!Data || !FltObjects) {
+			return STATUS_INVALID_PARAMETER;
+		}
+		PFLT_FILE_NAME_INFORMATION pFileNameInfo = NULL;
+		NTSTATUS status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &pFileNameInfo);
+		if (!NT_SUCCESS(status)) {
+			return status;
+		}
+		if (pFileNameInfo && pFileNameInfo->Stream.Length) {
+			isNonDefault = TRUE;
+		}
+		FltReleaseFileNameInformation(pFileNameInfo);
+		return status;
+	}
+
 	NTSTATUS GetFileId(PCFLT_RELATED_OBJECTS FltObjects, PFLT_CALLBACK_DATA Data, LONGLONG& FileId, char *caller)
 	{
 		UNREFERENCED_PARAMETER(caller);
@@ -234,6 +251,12 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 
 	// Check if it is creating a new file:
 	if (FltUtil::IsCreateOrOverwriteEmpty(Data, FltObjects)) {
+		BOOLEAN isAltStream = FALSE;
+		if (NT_SUCCESS(FltUtil::IsNonDefaultFileStream(FltObjects, Data, isAltStream)) && isAltStream) {
+			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+			DbgPrint(DRIVER_PREFIX "[%d] WARNING: Creating Alternative Data Streams is forbidden\n", sourcePID);
+			return FLT_PREOP_COMPLETE;
+		}
 		// check if adding the file is possible:
 		if (!Data::CanAddFile(sourcePID)) {
 			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
