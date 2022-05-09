@@ -82,23 +82,6 @@ void OnProcessNotify(_Inout_ PEPROCESS Process, _In_ HANDLE ProcessId, _Inout_op
 	}
 }
 
-void OnThreadNotify(HANDLE ProcessId, HANDLE Thread, BOOLEAN Create)
-{
-	const ULONG creatorPID = HandleToULong(PsGetCurrentProcessId()); //the PID creating the thread
-	const ULONG targetPID = HandleToULong(ProcessId);
-	const ULONG ThreadId = HandleToULong(Thread);
-
-	if (!Data::ContainsProcess(creatorPID)) {
-		return;
-	}
-	if (Create && (creatorPID != targetPID)) {
-		DbgPrint(DRIVER_PREFIX "[%d] THREAD: Creating remote thread! %d -> %d [%x]\n", creatorPID, creatorPID, targetPID, targetPID);
-		if (Data::AddProcess(targetPID, creatorPID) == ADD_LIMIT_EXHAUSTED) {
-			DbgPrint(DRIVER_PREFIX "[%d] Could not add to the watchlist: limit exhausted\n", targetPID);
-		}
-	}
-}
-
 #define _RETRIEVE_PATH
 void OnImageLoadNotify(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_INFO ImageInfo)
 {
@@ -168,10 +151,6 @@ void MyDriverUnload(_In_ PDRIVER_OBJECT DriverObject)
 	if (g_Settings.hasImageNotify) {
 		PsRemoveLoadImageNotifyRoutine(OnImageLoadNotify);
 		g_Settings.hasImageNotify = false;
-	}
-	if (g_Settings.hasThreadNotify) {
-		PsRemoveCreateThreadNotifyRoutine(OnThreadNotify);
-		g_Settings.hasThreadNotify = false;
 	}
 	if (g_Settings.hasProcessNotify) {
 		PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, TRUE);
@@ -662,15 +641,6 @@ NTSTATUS _InitializeDriver(_In_ PDRIVER_OBJECT DriverObject)
 	}
 	else {
 		DbgPrint(DRIVER_PREFIX "failed to register process callback (0x%08X)\n", status);
-		return status;
-	}
-
-	status = PsSetCreateThreadNotifyRoutine(OnThreadNotify);
-	if (NT_SUCCESS(status)) {
-		g_Settings.hasThreadNotify = true;
-	}
-	else {
-		DbgPrint(DRIVER_PREFIX "failed to set thread callback (status=%08X)\n", status);
 		return status;
 	}
 
