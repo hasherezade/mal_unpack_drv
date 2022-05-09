@@ -12,8 +12,6 @@ typedef struct _active_settings {
 	bool hasDevice;
 	bool hasLink;
 	bool hasProcessNotify;
-	bool hasThreadNotify;
-	bool hasImageNotify;
 	PVOID RegHandle;
 	LARGE_INTEGER RegCookie;
 	PFLT_FILTER gFilterHandle;
@@ -23,8 +21,6 @@ typedef struct _active_settings {
 		hasDevice = false;
 		hasLink = false;
 		hasProcessNotify = false;
-		hasThreadNotify = false;
-		hasImageNotify = false;
 		RegHandle = NULL;
 		RegCookie.QuadPart = 0;
 		gFilterHandle = NULL;
