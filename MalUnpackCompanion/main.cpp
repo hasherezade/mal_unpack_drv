@@ -699,8 +699,8 @@ DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 	DbgPrint(DRIVER_PREFIX "OS Version: %d.%d.%d\n", version.dwMajorVersion, version.dwMinorVersion, version.dwBuildNumber);
 	DbgPrint(DRIVER_PREFIX "Driver Version: %s\n", VER_FILEVERSION_STR);
 
-	if (!RtlIsNtDdiVersionAvailable(NTDDI_WIN7)) {
-		DbgPrint(DRIVER_PREFIX "Windows < 7 is not supported!\n");
+	if (!RtlIsNtDdiVersionAvailable(NTDDI_WINBLUE)) {
+		DbgPrint(DRIVER_PREFIX "Windows < 8.1 is not supported!\n");
 		return STATUS_NOT_SUPPORTED;
 	}
 
