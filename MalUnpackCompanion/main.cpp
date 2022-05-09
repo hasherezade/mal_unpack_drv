@@ -82,51 +82,6 @@ void OnProcessNotify(_Inout_ PEPROCESS Process, _In_ HANDLE ProcessId, _Inout_op
 	}
 }
 
-#define _RETRIEVE_PATH
-void OnImageLoadNotify(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_INFO ImageInfo)
-{
-	if (ProcessId == nullptr) {
-		// system process, ignore
-		return;
-	}
-#ifdef _RETRIEVE_PATH
-	UNREFERENCED_PARAMETER(FullImageName);
-	// retrieve image path manually: backward compatibility with Windows < 10
-	WCHAR FileName[FileUtil::MAX_PATH_LEN] = { 0 };
-	if (!FileUtil::RetrieveImagePath(ImageInfo, FileName)) {
-		return;
-	}
-	UNICODE_STRING ImageU = { 0 };
-	RtlInitUnicodeString(&ImageU, FileName);
-
-	PUNICODE_STRING ImagePath = &ImageU;
-#else
-	UNREFERENCED_PARAMETER(ImageInfo);
-	PUNICODE_STRING ImagePath = FullImageName;
-#endif
-	if (!ImagePath) {
-		return;
-	}
-	const ULONG PID = HandleToULong(ProcessId);
-	//DbgPrint(DRIVER_PREFIX __FUNCTION__" [%d] Retrieved path: %S\n", PID, ImagePath->Buffer);
-
-	LONGLONG fileId = FileUtil::GetFileIdByPath(ImagePath);
-	if (fileId == FILE_INVALID_FILE_ID) {
-		return;
-	}
-
-	const t_add_status aStat = Data::AddProcessToFileOwner(PID, fileId);
-	if (aStat == ADD_INVALID_ITEM) {
-		return; // this file is not owned by any process
-	}
-	if (aStat == ADD_LIMIT_EXHAUSTED) {
-		DbgPrint(DRIVER_PREFIX "[%d] Could not add to the watchlist: limit exhausted\n");
-	}
-	if (aStat == ADD_OK) {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__" [%d] Added process created from the OWNED file-> %zX\n", PID, fileId);
-	}
-}
-
 void _UnregisterCallbacks()
 {
 	if (g_Settings.RegHandle) {
@@ -148,10 +103,6 @@ void MyDriverUnload(_In_ PDRIVER_OBJECT DriverObject)
 	Data::FreeGlobals();
 
 	//unregister the notification
-	if (g_Settings.hasImageNotify) {
-		PsRemoveLoadImageNotifyRoutine(OnImageLoadNotify);
-		g_Settings.hasImageNotify = false;
-	}
 	if (g_Settings.hasProcessNotify) {
 		PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, TRUE);
 		g_Settings.hasProcessNotify = false;
@@ -641,15 +592,6 @@ NTSTATUS _InitializeDriver(_In_ PDRIVER_OBJECT DriverObject)
 	}
 	else {
 		DbgPrint(DRIVER_PREFIX "failed to register process callback (0x%08X)\n", status);
-		return status;
-	}
-
-	status = PsSetLoadImageNotifyRoutine(OnImageLoadNotify);
-	if (NT_SUCCESS(status)) {
-		g_Settings.hasImageNotify = true;
-	}
-	else {
-		DbgPrint(DRIVER_PREFIX "failed to set image notify callback (status=%08X)\n", status);
 		return status;
 	}
 	return STATUS_SUCCESS;
