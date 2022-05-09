@@ -462,6 +462,14 @@ FLT_POSTOP_CALLBACK_STATUS MyPostCleanup(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_
 
 	PAGED_CODE();
 
+	if (Flags & FLTFL_POST_OPERATION_DRAINING) {
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	}
+
+	if (!NT_SUCCESS(Data->IoStatus.Status)) {
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	}
+
 	FILE_STANDARD_INFORMATION fileInfo;
 	NTSTATUS status = FltQueryInformationFile(Data->Iopb->TargetInstance,
 		Data->Iopb->TargetFileObject,
