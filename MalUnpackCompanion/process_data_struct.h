@@ -385,6 +385,9 @@ public:
 		if (pid1 == 0 || pid2 == 0) {
 			return false;
 		}
+		if (pid1 == pid2) {
+			return true;
+		}
 
 		AutoLock<FastMutex> lock(Mutex);
 
