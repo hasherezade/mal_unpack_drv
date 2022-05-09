@@ -437,7 +437,7 @@ NTSTATUS FetchDriverVersion(PIRP Irp, ULONG_PTR &outLen)
 
 NTSTATUS CountNodes(PIRP Irp, ULONG_PTR& outLen)
 {
-	auto counter = Data::CountProcessTrees();
+	ULONG counter = 0;
 	PIO_STACK_LOCATION stack = IoGetCurrentIrpStackLocation(Irp);
 	const size_t outBufSize = stack->Parameters.DeviceIoControl.OutputBufferLength;
 	if (outBufSize < sizeof(counter)) {
@@ -447,6 +447,7 @@ NTSTATUS CountNodes(PIRP Irp, ULONG_PTR& outLen)
 	if (outBuf == nullptr) {
 		return STATUS_INVALID_PARAMETER;
 	}
+	counter = static_cast<ULONG>(Data::CountProcessTrees());
 	::memcpy(outBuf, &counter, sizeof(counter));
 	outLen = sizeof(counter);
 	return STATUS_SUCCESS;
