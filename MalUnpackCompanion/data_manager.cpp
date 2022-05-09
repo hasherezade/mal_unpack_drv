@@ -84,16 +84,6 @@ t_add_status Data::AddProcessNode(ULONG pid, LONGLONG imgFileId, t_noresp respaw
 	return status;
 }
 
-t_add_status Data::AddProcessToFileOwner(ULONG PID, LONGLONG fileId)
-{
-	t_add_status status = g_ProcessNode.AddProcessToFileOwner(PID, fileId);
-	if (status == ADD_LIMIT_EXHAUSTED) {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Cannot add the process: %d, terminating...\n", PID);
-		ProcessUtil::TerminateProcess(PID);
-	}
-	return status;
-}
-
 int Data::CountProcessTrees()
 {
 	return g_ProcessNode.CountNodes();

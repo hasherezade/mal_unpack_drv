@@ -233,26 +233,6 @@ public:
 		return _addFile(fileId, parentPid);
 	}
 
-	t_add_status AddProcessToFileOwner(ULONG PID, LONGLONG fileId)
-	{
-		if (0 == PID || FILE_INVALID_FILE_ID == fileId) {
-			return ADD_INVALID_ITEM;
-		}
-
-		AutoLock<FastMutex> lock(Mutex);
-
-		t_add_status status = ADD_INVALID_ITEM;
-		for (int i = 0; i < ItemCount; i++)
-		{
-			ProcessNode& n = Items[i];
-			if (n._containsFile(fileId)) {
-				status = n._addProcess(PID);
-				break;
-			}
-		}
-		return status;
-	}
-
 	bool IsProcessInFileOwners(ULONG PID, LONGLONG fileId)
 	{
 		if (0 == PID || FILE_INVALID_FILE_ID == fileId) {

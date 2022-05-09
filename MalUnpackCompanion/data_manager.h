@@ -27,8 +27,6 @@ namespace Data {
 
     t_add_status AddProcessNode(ULONG pid, LONGLONG imgFileId, t_noresp respawnProtect);
 
-    t_add_status AddProcessToFileOwner(ULONG PID, LONGLONG fileId);
-
     bool IsProcessInFileOwners(ULONG pid1, LONGLONG fileId);
 
     int CountProcessTrees();
