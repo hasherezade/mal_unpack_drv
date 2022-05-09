@@ -243,9 +243,30 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 	if (params.Options & FILE_DIRECTORY_FILE) {
 		return FLT_PREOP_SUCCESS_NO_CALLBACK; // do not interfere
 	}
-	// check if the process is watched:
+
 	const ULONG sourcePID = HandleToULong(PsGetCurrentProcessId()); //the PID of the process performing the operation
+	const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
+
+	// block unrelated processes from respawning the malicious files:
+	if (DesiredAccess & FILE_EXECUTE) {
+		const PUNICODE_STRING fileName = (Data->Iopb->TargetFileObject) ? &Data->Iopb->TargetFileObject->FileName : nullptr;
+		LONGLONG fileId = FILE_INVALID_FILE_ID;
+		FltUtil::GetFileId(FltObjects, Data, fileId, __FUNCTION__);
+		if (Data::ContainsFile(fileId)) {
+			DbgPrint(DRIVER_PREFIX "[%d] Process is trying to open watchedfile for execute\n", sourcePID);
+			if (fileName) {
+				DbgPrint(DRIVER_PREFIX "[%llX] File Name: %wZ\n", fileId, fileName);
+			}
+			if (!Data::IsProcessInFileOwners(sourcePID, fileId)) {
+				Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+				DbgPrint(DRIVER_PREFIX " [%d] Could not run the watched file by a process that is not an owner\n", sourcePID);
+				return FLT_PREOP_COMPLETE;
+			}
+		}
+	}
+	// check if the process is watched:
 	if (!Data::ContainsProcess(sourcePID)) {
+		// not a watched process
 		return FLT_PREOP_SUCCESS_NO_CALLBACK; // not a watched process, do not interfere
 	}
 
@@ -267,7 +288,6 @@ FLT_PREOP_CALLBACK_STATUS MyFilterProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFL
 	}
 
 	const ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
-	const ACCESS_MASK DesiredAccess = (params.SecurityContext != nullptr) ? params.SecurityContext->DesiredAccess : 0;
 	const ULONG all_write = FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
 
 	// Retrieve and check the file ID:
