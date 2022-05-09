@@ -23,11 +23,11 @@ namespace Data {
 
     bool CanAddFile(ULONG parentPid);
 
-    t_add_status AddProcess(ULONG pid, ULONG parentPid);
+    t_add_status AddProcess(ULONG pid, ULONG parentPid, bool killOnFailure = true);
 
-    t_add_status AddProcessNode(ULONG pid, LONGLONG imgFileId, t_noresp respawnProtect);
+    t_add_status AddProcessNode(ULONG pid, LONGLONG imgFileId, t_noresp respawnProtect, bool killOnFailure = true);
 
-    t_add_status AddProcessToFileOwner(ULONG PID, LONGLONG fileId);
+    t_add_status AddProcessToFileOwner(ULONG PID, LONGLONG fileId, bool killOnFailure = true);
 
     bool IsProcessInFileOwners(ULONG pid1, LONGLONG fileId);
 

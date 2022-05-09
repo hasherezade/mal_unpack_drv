@@ -64,32 +64,38 @@ t_add_status Data::AddFile(LONGLONG fileId, ULONG parentPid)
 	return g_ProcessNode.AddFile(fileId, parentPid);
 }
 
-t_add_status Data::AddProcess(ULONG pid, ULONG parentPid)
+t_add_status Data::AddProcess(ULONG pid, ULONG parentPid, bool killOnFailure)
 {
 	t_add_status status = g_ProcessNode.AddProcess(pid, parentPid);
 	if (status == ADD_LIMIT_EXHAUSTED) {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Cannot add the process: %d, terminating...\n", pid);
-		ProcessUtil::TerminateProcess(pid);
+		if (killOnFailure) {
+			DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Cannot add the process: %d, terminating...\n", pid);
+			ProcessUtil::TerminateProcess(pid);
+		}
 	}
 	return status;
 }
 
-t_add_status Data::AddProcessNode(ULONG pid, LONGLONG imgFileId, t_noresp respawnProtect)
+t_add_status Data::AddProcessNode(ULONG pid, LONGLONG imgFileId, t_noresp respawnProtect, bool killOnFailure)
 {
 	t_add_status status = g_ProcessNode.AddProcessNode(pid, imgFileId, respawnProtect);
 	if (status == ADD_LIMIT_EXHAUSTED) {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Cannot add the process: %d, terminating...\n", pid);
-		ProcessUtil::TerminateProcess(pid);
+		if (killOnFailure) {
+			DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Cannot add the process: %d, terminating...\n", pid);
+			ProcessUtil::TerminateProcess(pid);
+		}
 	}
 	return status;
 }
 
-t_add_status Data::AddProcessToFileOwner(ULONG PID, LONGLONG fileId)
+t_add_status Data::AddProcessToFileOwner(ULONG PID, LONGLONG fileId, bool killOnFailure)
 {
 	t_add_status status = g_ProcessNode.AddProcessToFileOwner(PID, fileId);
 	if (status == ADD_LIMIT_EXHAUSTED) {
-		DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Cannot add the process: %d, terminating...\n", PID);
-		ProcessUtil::TerminateProcess(PID);
+		if (killOnFailure) {
+			DbgPrint(DRIVER_PREFIX __FUNCTION__ ": Cannot add the process: %d, terminating...\n", PID);
+			ProcessUtil::TerminateProcess(PID);
+		}
 	}
 	return status;
 }
