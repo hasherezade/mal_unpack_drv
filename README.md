@@ -16,7 +16,7 @@ MalUnpack companion driver: enhances capabilities of [mal_unpack](https://github
 Works with: https://github.com/hasherezade/mal_unpack
 
 
-Supported systems: Windows, starting from 8.1. Recommended system: Windows 10.
+Supported systems: Windows, starting from 7. Recommended system: Windows 10.
 
 **WARNING: This is an experimental version, use it on a Virtual Machine only!**
 
