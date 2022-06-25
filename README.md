@@ -31,6 +31,8 @@ bcdedit /set testsigning on
 
 Then reboot the system...
 
+_NOTE: In case if this is not sufficient, try another method (using Advanced Boot Options) described [here](https://www.howtogeek.com/167723/how-to-disable-driver-signature-verification-on-64-bit-windows-8.1-so-that-you-can-install-unsigned-drivers/)._
+
 2. Right click on `MalUnpackCompanion.inf` from the driver package. From the context menu, choose "Install"
 3. After the driver is installed, it remains inactive. In order to activate it, run the following command as Administrator:
 ```
